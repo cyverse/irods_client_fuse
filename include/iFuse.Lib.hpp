@@ -31,6 +31,7 @@ typedef struct IFuseOpt {
     int connKeepAliveSec;
     int connCheckIntervalSec;
     int rodsapiTimeoutSec;
+    int preloadNumThreads;
     int preloadNumBlocks;
     int metadataCacheTimeoutSec;
     char *ticket;

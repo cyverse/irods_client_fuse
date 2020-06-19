@@ -50,6 +50,7 @@ void iFuseCmdOptsInit() {
     g_Opt.connKeepAliveSec = IFUSE_FREE_CONN_KEEPALIVE_SEC;
     g_Opt.connCheckIntervalSec = IFUSE_FREE_CONN_CHECK_INTERVAL_SEC;
     g_Opt.rodsapiTimeoutSec = IFUSE_RODSCLIENTAPI_TIMEOUT_SEC;
+    g_Opt.preloadNumThreads = IFUSE_PRELOAD_THREAD_NUM;
     g_Opt.preloadNumBlocks = IFUSE_PRELOAD_PBLOCK_NUM;
     g_Opt.metadataCacheTimeoutSec = IFUSE_METADATA_CACHE_TIMEOUT_SEC;
 
@@ -109,6 +110,11 @@ void iFuseCmdOptsInit() {
     value = getenv("IRODSFS_APITIMEOUT"); // number
     if(value != NULL) {
         g_Opt.rodsapiTimeoutSec = atoi(value);
+    }
+
+    value = getenv("IRODSFS_PRELOADTHREADS"); // number
+    if(value != NULL) {
+        g_Opt.preloadNumThreads = atoi(value);
     }
 
     value = getenv("IRODSFS_PRELOADBLOCKS"); // number
@@ -294,9 +300,22 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                     g_Opt.rodsapiTimeoutSec = atoi(cmd.value);
                 }
                 processed = true;
+            } else if(strcmp(cmd.command, "preloadthreads") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    g_Opt.preloadNumThreads = atoi(cmd.value);
+                } else {
+                    g_Opt.preload = false;
+                    g_Opt.preloadNumBlocks = 0;
+                    processed = true;
+                }
+                processed = true;
             } else if(strcmp(cmd.command, "preloadblocks") == 0) {
                 if(strlen(cmd.value) > 0) {
                     g_Opt.preloadNumBlocks = atoi(cmd.value);
+                } else {
+                    g_Opt.preload = false;
+                    g_Opt.preloadNumBlocks = 0;
+                    processed = true;
                 }
                 processed = true;
             } else if(strcmp(cmd.command, "metadatacachetimeout") == 0) {

@@ -24,8 +24,14 @@ static pthread_rwlock_t g_PreloadLock;
 
 static std::map<unsigned long, iFusePreload_t*> g_PreloadMap;
 
+static int g_preloadNumThreads = IFUSE_PRELOAD_THREAD_NUM;
 static int g_preloadNumBlocks = IFUSE_PRELOAD_PBLOCK_NUM;
 
+//TODO: Need to implement preloading... - g_preloadNumThreads
+// use a thread pool to enforce a max num. of connections
+// make a active/idle queue for threads
+// make a incomplete/complete queue for blocks
+// 
 static int _newPreloadPBlock(const char *iRodsPath, iFusePreloadPBlock_t **iFusePreloadPBlock) {
     iFusePreloadPBlock_t *tmpIFusePreloadPBlock = NULL;
 
@@ -419,7 +425,7 @@ int _readPreload(iFusePreload_t *iFusePreload, char *buf, unsigned int blockID) 
             }
         }
     }
-    
+
     pthread_rwlock_unlock(&iFusePreload->lock);
 
     for(i=0;i<g_preloadNumBlocks;i++) {
@@ -458,12 +464,25 @@ int _readPreload(iFusePreload_t *iFusePreload, char *buf, unsigned int blockID) 
 void iFusePreloadInit() {
     if(iFuseLibGetOption()->preloadNumBlocks > 0) {
         g_preloadNumBlocks = iFuseLibGetOption()->preloadNumBlocks;
-        
+
         if(g_preloadNumBlocks > IFUSE_PRELOAD_MAX_PBLOCK_NUM) {
             g_preloadNumBlocks = IFUSE_PRELOAD_MAX_PBLOCK_NUM;
         }
     }
-    
+
+    if(iFuseLibGetOption()->preloadNumThreads > 0) {
+        g_preloadNumThreads = iFuseLibGetOption()->preloadNumThreads;
+
+        if(g_preloadNumThreads > IFUSE_PRELOAD_MAX_THREAD_NUM) {
+            g_preloadNumThreads = IFUSE_PRELOAD_MAX_THREAD_NUM;
+        }
+
+        // number of threads cannot be bigger than number of blocks
+        if(g_preloadNumThreads > g_preloadNumBlocks) {
+            g_preloadNumThreads = g_preloadNumBlocks;
+        }
+    }
+
     pthread_rwlockattr_init(&g_PreloadLockAttr);
     pthread_rwlock_init(&g_PreloadLock, &g_PreloadLockAttr);
 }

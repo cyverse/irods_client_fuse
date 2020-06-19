@@ -5,6 +5,6 @@
 #ifndef IFUSE_VERSION_HPP
 #define IFUSE_VERSION_HPP
 
-#define IFUSE_VERSION "2.1.1"
+#define IFUSE_VERSION "2.1.2"
 
 #endif	/* IFUSE_VERSION_HPP */
