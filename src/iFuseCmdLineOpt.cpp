@@ -361,6 +361,20 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                 // skip - fuse command
             } else if(strncmp(cmd.command, "subtype", strlen("subtype")) == 0) {
                 // skip - fuse command
+            } else if(strncmp(cmd.command, "ro", strlen("ro")) == 0) {
+                // skip - fuse command
+            } else if(strncmp(cmd.command, "rw", strlen("rw")) == 0) {
+                // skip - fuse command
+            } else if(strncmp(cmd.command, "suid", strlen("suid")) == 0) {
+                // skip - fuse command
+            } else if(strncmp(cmd.command, "nosuid", strlen("nosuid")) == 0) {
+                // skip - fuse command
+            } else if(strncmp(cmd.command, "sync", strlen("sync")) == 0) {
+                // skip - fuse command
+            } else if(strncmp(cmd.command, "async", strlen("async")) == 0) {
+                // skip - fuse command
+            } else if(strncmp(cmd.command, "dirsync", strlen("dirsync")) == 0) {
+                // skip - fuse command
             } else if(strlen(cmd.command) == 1) {
                 // skip - short commands
             } else {
