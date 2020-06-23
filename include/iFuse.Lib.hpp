@@ -34,6 +34,12 @@ typedef struct IFuseOpt {
     int preloadNumThreads;
     int preloadNumBlocks;
     int metadataCacheTimeoutSec;
+    char *host;
+    int port;
+    char *zone;
+    char *user;
+    char *password;
+    char *defResource;
     char *ticket;
     char *workdir;
     char *mountpoint;

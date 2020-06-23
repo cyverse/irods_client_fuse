@@ -44,38 +44,39 @@ static time_t g_LastConnCheck = 0;
 
 static unsigned long _genNextConnID() {
     unsigned long newId;
-    
+
     pthread_rwlock_wrlock(&g_IDGenLock);
-    
+
     newId = g_ConnIDGen++;
-    
+
     pthread_rwlock_unlock(&g_IDGenLock);
-    
+
     return newId;
 }
 
 static int _connect(iFuseConn_t *iFuseConn) {
     int status = 0;
-    rodsEnv *myRodsEnv = iFuseLibGetRodsEnv();
-    
     int reconnFlag = NO_RECONN;
 
-    assert(myRodsEnv != NULL);
     assert(iFuseConn != NULL);
 
     if (iFuseConn->conn == NULL) {
         rErrMsg_t errMsg;
-        iFuseConn->conn = iFuseRodsClientConnect(myRodsEnv->rodsHost, myRodsEnv->rodsPort,
-                myRodsEnv->rodsUserName, myRodsEnv->rodsZone, reconnFlag, &errMsg);
+        iFuseOpt_t *opt = iFuseLibGetOption();
+
+        assert(opt != NULL);
+
+        iFuseConn->conn = iFuseRodsClientConnect(opt->host, opt->port,
+                opt->user, opt->zone, reconnFlag, &errMsg);
         if (iFuseConn->conn == NULL) {
             // try one more
-            iFuseConn->conn = iFuseRodsClientConnect(myRodsEnv->rodsHost, myRodsEnv->rodsPort,
-                    myRodsEnv->rodsUserName, myRodsEnv->rodsZone, reconnFlag, &errMsg);
+            iFuseConn->conn = iFuseRodsClientConnect(opt->host, opt->port,
+                    opt->user, opt->zone, reconnFlag, &errMsg);
             if (iFuseConn->conn == NULL) {
                 // failed
                 iFuseLibLogError(LOG_ERROR, errMsg.status,
                         "_connect: iFuseRodsClientConnect failure %s", errMsg.msg);
-                iFuseLibLog(LOG_ERROR, "Cannot connect to iRODS Host - %s:%d error - %s", myRodsEnv->rodsHost, myRodsEnv->rodsPort, errMsg.msg);
+                iFuseLibLog(LOG_ERROR, "Cannot connect to iRODS Host - %s:%d error - %s", opt->host, opt->port, errMsg.msg);
                 if (errMsg.status < 0) {
                     return errMsg.status;
                 } else {
@@ -93,14 +94,14 @@ static int _connect(iFuseConn_t *iFuseConn) {
 
             // failed
             iFuseLibLog(LOG_ERROR, "iFuseRodsClientLogin failure, status = %d", status);
-            iFuseLibLog(LOG_ERROR, "Cannot log in to iRODS - account %s", myRodsEnv->rodsUserName);
+            iFuseLibLog(LOG_ERROR, "Cannot log in to iRODS - account %s", opt->user);
             return status;
         }
-        
-        if(iFuseLibGetOption()->ticket != NULL) {
-            char* ticket = iFuseLibGetOption()->ticket;
+
+        if(opt->ticket != NULL) {
+            char* ticket = opt->ticket;
             ticketAdminInp_t ticketAdminInp;
-            
+
             bzero(&ticketAdminInp, sizeof ( ticketAdminInp_t));
             ticketAdminInp.arg1 = "session";
             ticketAdminInp.arg2 = ticket;
@@ -108,7 +109,7 @@ static int _connect(iFuseConn_t *iFuseConn) {
             ticketAdminInp.arg4 = "";
             ticketAdminInp.arg5 = "";
             ticketAdminInp.arg6 = "";
-            
+
             status = iFuseRodsClientSetSessionTicket(iFuseConn->conn, &ticketAdminInp);
             if (status != 0) {
                 iFuseRodsClientDisconnect(iFuseConn->conn);
@@ -152,7 +153,7 @@ static int _newConn(iFuseConn_t **iFuseConn) {
 
     pthread_rwlockattr_init(&tmpIFuseConn->lockAttr);
     pthread_rwlock_init(&tmpIFuseConn->lock, &tmpIFuseConn->lockAttr);
-    
+
     // connect
     status = _connect(tmpIFuseConn);
     tmpIFuseConn->lastActTime = iFuseLibGetCurrentTime();
@@ -218,7 +219,7 @@ static int _freeAllConn() {
             _freeConn(tmpIFuseConn);
         }
     }
-    
+
     pthread_rwlock_unlock(&g_ConnectedConnLock);
 
     return 0;
@@ -270,9 +271,9 @@ static void _connChecker() {
     iFuseConn_t *iFuseConn;
     time_t current;
     int i;
-    
+
     //iFuseLibLog(LOG_DEBUG, "_connChecker is called");
-    
+
     current = iFuseLibGetCurrentTime();
 
     if(iFuseLibDiffTimeSec(current, g_LastConnCheck) > g_ConnCheckIntervalSec) {
@@ -300,7 +301,7 @@ static void _connChecker() {
                 _keepAlive(iFuseConn);
             }
         }
-        
+
         for(it_conn=g_FreeConn.begin();it_conn!=g_FreeConn.end();it_conn++) {
             iFuseConn = *it_conn;
 
@@ -308,13 +309,13 @@ static void _connChecker() {
                 _keepAlive(iFuseConn);
             }
         }
-        
+
         if(g_FreeShortopConn != NULL) {
             if(iFuseLibDiffTimeSec(current, g_FreeShortopConn->lastActTime) >= g_ConnKeepAliveSec) {
                 _keepAlive(g_FreeShortopConn);
             }
         }
-        
+
         pthread_rwlock_unlock(&g_ConnectedConnLock);
 
         pthread_rwlock_wrlock(&g_ConnectedConnLock);
@@ -344,56 +345,50 @@ static void _connChecker() {
         }
 
         pthread_rwlock_unlock(&g_ConnectedConnLock);
-        
+
         g_LastConnCheck = iFuseLibGetCurrentTime();
     }
 }
 
 int iFuseConnTest() {
     int status;
-    rodsEnv *myRodsEnv = iFuseLibGetRodsEnv();
+    iFuseOpt_t *opt = iFuseLibGetOption();
     iFuseConn_t *iFuseConn = NULL;
-    
+
     //check host
-    if(myRodsEnv == NULL) {
-        iFuseLibLog(LOG_ERROR, "Cannot read rods environment");
-        fprintf(stderr, "Cannot read rods environment\n");
+    if(strlen(opt->host) == 0) {
+        iFuseLibLog(LOG_ERROR, "iRODS Host is not configured");
+        fprintf(stderr, "iRODS Host is not configured\n");
         return -1;
     }
-    
-    if(strlen(myRodsEnv->rodsHost) == 0) {
-        iFuseLibLog(LOG_ERROR, "iRODS Host is not configured in rods environment");
-        fprintf(stderr, "iRODS Host is not configured in rods environment\n");
+
+    if(opt->port <= 0) {
+        iFuseLibLog(LOG_ERROR, "iRODS Port is not configured");
+        fprintf(stderr, "iRODS Port is not configured\n");
         return -1;
     }
-    
-    if(myRodsEnv->rodsPort <= 0) {
-        iFuseLibLog(LOG_ERROR, "iRODS Port is not configured in rods environment");
-        fprintf(stderr, "iRODS Port is not configured in rods environment\n");
+
+    if(strlen(opt->user) == 0) {
+        iFuseLibLog(LOG_ERROR, "iRODS User Account is not configured");
+        fprintf(stderr, "iRODS User Account is not configured\n");
         return -1;
     }
-    
-    if(strlen(myRodsEnv->rodsUserName) == 0) {
-        iFuseLibLog(LOG_ERROR, "iRODS User Account is not configured in rods environment");
-        fprintf(stderr, "iRODS User Account is not configured in rods environment\n");
+
+    if(strlen(opt->zone) == 0) {
+        iFuseLibLog(LOG_ERROR, "iRODS Zone is not configured");
+        fprintf(stderr, "iRODS Zone is not configured\n");
         return -1;
     }
-    
-    if(strlen(myRodsEnv->rodsZone) == 0) {
-        iFuseLibLog(LOG_ERROR, "iRODS Zone is not configured in rods environment");
-        fprintf(stderr, "iRODS Zone is not configured in rods environment\n");
-        return -1;
-    }
-    
-    iFuseLibLog(LOG_DEBUG, "iFuseConnTest: make a test connection to iRODS host - %s:%d", myRodsEnv->rodsHost, myRodsEnv->rodsPort);
-    
+
+    iFuseLibLog(LOG_DEBUG, "iFuseConnTest: make a test connection to iRODS host - %s:%d", opt->host, opt->port);
+
     status = iFuseConnGetAndUse(&iFuseConn, IFUSE_CONN_TYPE_FOR_SHORTOP);
     if (status < 0) {
         iFuseLibLogError(LOG_ERROR, status, "iFuseConnTest: iFuseConnGetAndUse error");
         fprintf(stderr, "Cannot establish a connection");
         return status;
     }
-    
+
     iFuseConnUnuse(iFuseConn);
     return 0;
 }
@@ -415,7 +410,7 @@ void iFuseConnInit() {
     if(iFuseLibGetOption()->connKeepAliveSec > 0) {
         g_ConnKeepAliveSec = iFuseLibGetOption()->connKeepAliveSec;
     }
-    
+
     if(iFuseLibGetOption()->connCheckIntervalSec > 0) {
         g_ConnCheckIntervalSec = iFuseLibGetOption()->connCheckIntervalSec;
    }
@@ -430,7 +425,7 @@ void iFuseConnInit() {
     }
 
     g_ConnIDGen = 0;
-    
+
     pthread_rwlockattr_init(&g_IDGenLockAttr);
     pthread_rwlock_init(&g_IDGenLock, &g_IDGenLockAttr);
 
@@ -442,7 +437,7 @@ void iFuseConnInit() {
  */
 void iFuseConnDestroy() {
     iFuseLibUnsetTimerTickHandler(_connChecker);
-    
+
     g_ConnIDGen = 0;
 
     _freeAllConn();
@@ -451,7 +446,7 @@ void iFuseConnDestroy() {
     pthread_rwlockattr_destroy(&g_ConnectedConnLockAttr);
 
     free(g_InUseConn);
-    
+
     pthread_rwlock_destroy(&g_IDGenLock);
     pthread_rwlockattr_destroy(&g_IDGenLockAttr);
 }
@@ -465,20 +460,20 @@ void iFuseConnReport(iFuseFsConnReport_t *report) {
     iFuseConn_t *iFuseConn;
     int i;
     time_t current;
-    
+
     assert(report != NULL);
-    
+
     bzero(report, sizeof(iFuseFsConnReport_t));
 
     pthread_rwlock_rdlock(&g_ConnectedConnLock);
-    
+
     current = iFuseLibGetCurrentTime();
 
     if(g_InUseShortopConn != NULL) {
         iFuseLibLog(LOG_DEBUG, "iFuseConnReport: short-op connection (%lu) is in use, last act = %d sec ago, last use = %d sec ago", g_InUseShortopConn->connId, (int)iFuseLibDiffTimeSec(current, g_InUseShortopConn->lastActTime), (int)iFuseLibDiffTimeSec(current, g_InUseShortopConn->lastUseTime));
         report->inuseShortOpConn++;
     }
-    
+
     for(i=0;i<g_MaxConnNum;i++) {
         if(g_InUseConn[i] != NULL) {
             iFuseLibLog(LOG_DEBUG, "iFuseConnReport: general connection (%lu) is in use, last act = %d sec ago, last use = %d sec ago", g_InUseConn[i]->connId, (int)iFuseLibDiffTimeSec(current, g_InUseConn[i]->lastActTime), (int)iFuseLibDiffTimeSec(current, g_InUseConn[i]->lastUseTime));
@@ -488,24 +483,24 @@ void iFuseConnReport(iFuseFsConnReport_t *report) {
 
     for(it_connmap=g_InUseOnetimeuseConn.begin();it_connmap!=g_InUseOnetimeuseConn.end();it_connmap++) {
         iFuseConn = it_connmap->second;
-        
+
         iFuseLibLog(LOG_DEBUG, "iFuseConnReport: one-time-use connection (%lu) is in use, last act = %d sec ago, last use = %d sec ago", iFuseConn->connId, (int)iFuseLibDiffTimeSec(current, iFuseConn->lastActTime), (int)iFuseLibDiffTimeSec(current, iFuseConn->lastUseTime));
         report->inuseOnetimeuseConn++;
     }
-    
+
     if(g_FreeShortopConn != NULL) {
         iFuseLibLog(LOG_DEBUG, "iFuseConnReport: short-op connection (%lu) is free, last act = %d sec ago, last use = %d sec ago", g_FreeShortopConn->connId, (int)iFuseLibDiffTimeSec(current, g_FreeShortopConn->lastActTime), (int)iFuseLibDiffTimeSec(current, g_FreeShortopConn->lastUseTime));
-        
+
         report->freeShortopConn++;
     }
-    
+
     for(it_conn=g_FreeConn.begin();it_conn!=g_FreeConn.end();it_conn++) {
         iFuseConn = *it_conn;
-        
+
         iFuseLibLog(LOG_DEBUG, "iFuseConnReport: connection (%lu) is free, last act = %d sec ago, last use = %d sec ago", iFuseConn->connId, (int)iFuseLibDiffTimeSec(current, iFuseConn->lastActTime), (int)iFuseLibDiffTimeSec(current, iFuseConn->lastUseTime));
         report->freeConn++;
     }
-    
+
     pthread_rwlock_unlock(&g_ConnectedConnLock);
 }
 
@@ -769,7 +764,7 @@ int iFuseConnReconnect(iFuseConn_t *iFuseConn) {
 
     iFuseLibLog(LOG_DEBUG, "iFuseConnReconnect: connecting - %lu", iFuseConn->connId);
     status = _connect(iFuseConn);
-    
+
     iFuseConn->lastActTime = iFuseLibGetCurrentTime();
 
     pthread_rwlock_unlock(&iFuseConn->lock);

@@ -34,42 +34,42 @@ static void _timeoutChecker() {
     std::list<iFuseRodsClientOperation_t*> removeList;
     iFuseRodsClientOperation_t *oper;
     time_t currentTime;
-    
+
     bool hasTimeout = false;
-    
+
     //iFuseLibLog(LOG_DEBUG, "_timeoutChecker is called");
-    
+
     currentTime = iFuseLibGetCurrentTime();
-    
+
     if(iFuseLibDiffTimeSec(currentTime, g_LastRodsapiTimeoutCheck) > g_RodsapiTimeoutSec / 2) {
         //iFuseLibLog(LOG_DEBUG, "_timeoutChecker: checking timedout rodsAPI calls");
         pthread_rwlock_rdlock(&g_RodsClientAPILock);
-        
+
         // iterate operation list to check timedout
         for(it_oper=g_Operations.begin();it_oper!=g_Operations.end();it_oper++) {
             oper = *it_oper;
-            
+
             if(iFuseLibDiffTimeSec(currentTime, oper->start) >= g_RodsapiTimeoutSec) {
                 hasTimeout = true;
                 break;
             }
         }
-        
+
         pthread_rwlock_unlock(&g_RodsClientAPILock);
-        
+
         if(hasTimeout) {
             pthread_rwlock_wrlock(&g_RodsClientAPILock);
-            
+
             // iterate operation list to check timedout
             for(it_oper=g_Operations.begin();it_oper!=g_Operations.end();it_oper++) {
                 oper = *it_oper;
-                
+
                 if(iFuseLibDiffTimeSec(currentTime, oper->start) >= g_RodsapiTimeoutSec) {
                     iFuseLibLog(LOG_DEBUG, "_timeoutChecker: detected timed-out operation\n");
                     removeList.push_back(oper);
                 }
             }
-            
+
             // iterate remove list
             while(!removeList.empty()) {
                 oper = removeList.front();
@@ -102,10 +102,10 @@ static void _timeoutChecker() {
                     shutdown(oper->conn->sock, 2);
                 }
             }
-            
+
             pthread_rwlock_unlock(&g_RodsClientAPILock);
         }
-        
+
         g_LastRodsapiTimeoutCheck = iFuseLibGetCurrentTime();
     }
 }
@@ -115,14 +115,14 @@ static iFuseRodsClientOperation_t *_startOperationTimeout(rcComm_t *conn) {
     if(oper == NULL) {
         return NULL;
     }
-    
+
     oper->start = iFuseLibGetCurrentTime();
     oper->conn = conn;
-    
+
     pthread_rwlock_wrlock(&g_RodsClientAPILock);
     g_Operations.push_back(oper);
     pthread_rwlock_unlock(&g_RodsClientAPILock);
-    
+
     return oper;
 }
 
@@ -130,7 +130,7 @@ static void _endOperationTimeout(iFuseRodsClientOperation_t *oper) {
     pthread_rwlock_wrlock(&g_RodsClientAPILock);
     g_Operations.remove(oper);
     pthread_rwlock_unlock(&g_RodsClientAPILock);
-    
+
     free(oper);
 }
 
@@ -138,14 +138,14 @@ static void _endOperationTimeout(iFuseRodsClientOperation_t *oper) {
  * Initialize iFuse Rods Client
  */
 void iFuseRodsClientInit() {
-   
+
     if(iFuseLibGetOption()->rodsapiTimeoutSec > 0) {
         g_RodsapiTimeoutSec = iFuseLibGetOption()->rodsapiTimeoutSec;
     }
-   
+
     pthread_rwlockattr_init(&g_RodsClientAPILockAttr);
     pthread_rwlock_init(&g_RodsClientAPILock, &g_RodsClientAPILockAttr);
-    
+
     iFuseLibSetTimerTickHandler(_timeoutChecker);
 }
 
@@ -154,7 +154,7 @@ void iFuseRodsClientInit() {
  */
 void iFuseRodsClientDestroy() {
     iFuseLibUnsetTimerTickHandler(_timeoutChecker);
-    
+
     pthread_rwlock_destroy(&g_RodsClientAPILock);
     pthread_rwlockattr_destroy(&g_RodsClientAPILockAttr);
 }
@@ -205,11 +205,24 @@ rcComm_t *iFuseRodsClientConnect(const char *rodsHost, int rodsPort, const char 
 int iFuseRodsClientLogin(rcComm_t *conn) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
+    status = clientLogin(conn);
+    _endOperationTimeout(oper);
+    return status;
+}
+
+int iFuseRodsClientLoginWithPassword(rcComm_t *conn, char* password) {
+    iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
+    int status;
+
+    if(oper == NULL) {
+        return SYS_MALLOC_ERR;
+    }
+
     status = clientLogin(conn);
     _endOperationTimeout(oper);
     return status;
@@ -226,7 +239,7 @@ int iFuseRodsClientMakeRodsPath(const char *path, char *iRodsPath) {
 int iFuseRodsClientSetSessionTicket(rcComm_t *conn, ticketAdminInp_t *ticketAdminInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
@@ -239,11 +252,11 @@ int iFuseRodsClientSetSessionTicket(rcComm_t *conn, ticketAdminInp_t *ticketAdmi
 int iFuseRodsClientDataObjOpen(rcComm_t *conn, dataObjInp_t *dataObjInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjOpen(conn, dataObjInp);
     _endOperationTimeout(oper);
     return status;
@@ -252,11 +265,11 @@ int iFuseRodsClientDataObjOpen(rcComm_t *conn, dataObjInp_t *dataObjInp) {
 int iFuseRodsClientDataObjClose(rcComm_t *conn, openedDataObjInp_t *dataObjCloseInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjClose(conn, dataObjCloseInp);
     _endOperationTimeout(oper);
     return status;
@@ -265,11 +278,11 @@ int iFuseRodsClientDataObjClose(rcComm_t *conn, openedDataObjInp_t *dataObjClose
 int iFuseRodsClientOpenCollection(rcComm_t *conn, char *collection, int flag, collHandle_t *collHandle) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rclOpenCollection(conn, collection, flag, collHandle);
     _endOperationTimeout(oper);
     return status;
@@ -282,11 +295,11 @@ int iFuseRodsClientCloseCollection(collHandle_t *collHandle) {
 int iFuseRodsClientObjStat(rcComm_t *conn, dataObjInp_t *dataObjInp, rodsObjStat_t **rodsObjStatOut) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcObjStat(conn, dataObjInp, rodsObjStatOut);
     _endOperationTimeout(oper);
     return status;
@@ -295,11 +308,11 @@ int iFuseRodsClientObjStat(rcComm_t *conn, dataObjInp_t *dataObjInp, rodsObjStat
 int iFuseRodsClientDataObjLseek(rcComm_t *conn, openedDataObjInp_t *dataObjLseekInp, fileLseekOut_t **dataObjLseekOut) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjLseek(conn, dataObjLseekInp, dataObjLseekOut);
     _endOperationTimeout(oper);
     return status;
@@ -308,11 +321,11 @@ int iFuseRodsClientDataObjLseek(rcComm_t *conn, openedDataObjInp_t *dataObjLseek
 int iFuseRodsClientDataObjRead(rcComm_t *conn, openedDataObjInp_t *dataObjReadInp, bytesBuf_t *dataObjReadOutBBuf) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjRead(conn, dataObjReadInp, dataObjReadOutBBuf);
     _endOperationTimeout(oper);
     return status;
@@ -321,11 +334,11 @@ int iFuseRodsClientDataObjRead(rcComm_t *conn, openedDataObjInp_t *dataObjReadIn
 int iFuseRodsClientDataObjWrite(rcComm_t *conn, openedDataObjInp_t *dataObjWriteInp, bytesBuf_t *dataObjWriteInpBBuf) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjWrite(conn, dataObjWriteInp, dataObjWriteInpBBuf);
     _endOperationTimeout(oper);
     return status;
@@ -334,11 +347,11 @@ int iFuseRodsClientDataObjWrite(rcComm_t *conn, openedDataObjInp_t *dataObjWrite
 int iFuseRodsClientDataObjCreate(rcComm_t *conn, dataObjInp_t *dataObjInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjCreate(conn, dataObjInp);
     _endOperationTimeout(oper);
     return status;
@@ -347,11 +360,11 @@ int iFuseRodsClientDataObjCreate(rcComm_t *conn, dataObjInp_t *dataObjInp) {
 int iFuseRodsClientDataObjUnlink(rcComm_t *conn, dataObjInp_t *dataObjUnlinkInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjUnlink(conn, dataObjUnlinkInp);
     _endOperationTimeout(oper);
     return status;
@@ -360,11 +373,11 @@ int iFuseRodsClientDataObjUnlink(rcComm_t *conn, dataObjInp_t *dataObjUnlinkInp)
 int iFuseRodsClientReadCollection(rcComm_t *conn, collHandle_t *collHandle, collEnt_t *collEnt) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rclReadCollection(conn, collHandle, collEnt);
     _endOperationTimeout(oper);
     return status;
@@ -373,11 +386,11 @@ int iFuseRodsClientReadCollection(rcComm_t *conn, collHandle_t *collHandle, coll
 int iFuseRodsClientCollCreate(rcComm_t *conn, collInp_t *collCreateInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcCollCreate(conn, collCreateInp);
     _endOperationTimeout(oper);
     return status;
@@ -386,11 +399,11 @@ int iFuseRodsClientCollCreate(rcComm_t *conn, collInp_t *collCreateInp) {
 int iFuseRodsClientRmColl(rcComm_t *conn, collInp_t *rmCollInp, int vFlag) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcRmColl(conn, rmCollInp, vFlag);
     _endOperationTimeout(oper);
     return status;
@@ -399,11 +412,11 @@ int iFuseRodsClientRmColl(rcComm_t *conn, collInp_t *rmCollInp, int vFlag) {
 int iFuseRodsClientDataObjRename(rcComm_t *conn, dataObjCopyInp_t *dataObjRenameInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjRename(conn, dataObjRenameInp);
     _endOperationTimeout(oper);
     return status;
@@ -412,11 +425,11 @@ int iFuseRodsClientDataObjRename(rcComm_t *conn, dataObjCopyInp_t *dataObjRename
 int iFuseRodsClientDataObjTruncate(rcComm_t *conn, dataObjInp_t *dataObjInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcDataObjTruncate(conn, dataObjInp);
     _endOperationTimeout(oper);
     return status;
@@ -425,11 +438,11 @@ int iFuseRodsClientDataObjTruncate(rcComm_t *conn, dataObjInp_t *dataObjInp) {
 int iFuseRodsClientModDataObjMeta(rcComm_t *conn, modDataObjMeta_t *modDataObjMetaInp) {
     iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
     int status;
-    
+
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
     }
-    
+
     status = rcModDataObjMeta(conn, modDataObjMetaInp);
     _endOperationTimeout(oper);
     return status;

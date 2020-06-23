@@ -27,6 +27,9 @@
 static struct fuse_operations irodsOper;
 
 static void usage();
+static int checkLoginInfo(iFuseOpt_t *opt);
+static int checkLoginInfoEnv(rodsEnv *env);
+static void syncLoginInfo(iFuseOpt_t *opt, rodsEnv *env);
 static int checkMountPoint(char *mountPoint, bool nonempty);
 static void registerClientProgram(char *prog);
 
@@ -65,12 +68,6 @@ int main(int argc, char **argv) {
     irodsOper.fsync = iFuseFsync;
     irodsOper.ioctl = iFuseIoctl;
 
-    status = getRodsEnv(&myRodsEnv);
-    if (status < 0) {
-        fprintf(stderr, "iRods Fuse abort: getRodsEnv error with status %d\n", status);
-        return 1;
-    }
-
     iFuseCmdOptsInit();
 
     status = iFuseCmdOptsParse(argc, argv);
@@ -79,6 +76,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // handle help and version
     iFuseGetOption(&myiFuseOpt);
 
     if (myiFuseOpt.help) {
@@ -91,6 +89,12 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    status = getRodsEnv(&myRodsEnv);
+    if (status < 0) {
+        fprintf(stderr, "iRods Fuse abort: getRodsEnv error with status %d\n", status);
+        return 1;
+    }
+
     // check mount point
     status = checkMountPoint(myiFuseOpt.mountpoint, myiFuseOpt.nonempty);
     if(status != 0) {
@@ -99,11 +103,22 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (myiFuseOpt.workdir != NULL) {
-        if(strlen(myiFuseOpt.workdir) < MAX_NAME_LEN) {
-            bzero(myRodsEnv.rodsCwd, MAX_NAME_LEN);
-            strcpy(myRodsEnv.rodsCwd, myiFuseOpt.workdir);
-        }
+    // sync rodsEnv and irods fuse opts
+    syncLoginInfo(&myiFuseOpt, &myRodsEnv);
+
+    // check login info
+    status = checkLoginInfo(&myiFuseOpt);
+    if (status != 0) {
+        // login info is not supplied
+        fprintf(stderr, "iRods Fuse abort: login info not given\n");
+        iFuseCmdOptsDestroy();
+    }
+
+    status = checkLoginInfoEnv(&myRodsEnv);
+    if (status != 0) {
+        // login info is not supplied
+        fprintf(stderr, "iRods Fuse abort: login info not given in RodsEnv\n");
+        iFuseCmdOptsDestroy();
     }
 
     registerClientProgram(argv[0]);
@@ -162,6 +177,12 @@ static void usage() {
         " -d                               Run irodsFs in debug mode",
         " -f                               Run irodsFs in foreground mode",
         " -v, -V, --version                Print version information",
+        " -H, --host                       Use given hostname and port <hostname:port>",
+        " -P, --port                       Use given port",
+        " -z, --zone                       Use given zone",
+        " --defresource                    Use given defResource",
+        " -u, --user                       Use given username and password <username:password>",
+        " -p, --password                   Use given password",
         " -t, --ticket <ticket_no>         Use ticket for authentication",
         " -w, --workdir <irods_dir>        Use given irods dir as a work dir",
         " --nocache                        Disable all caching features (Buffered IO, Preload, Metadata Cache)",
@@ -185,6 +206,124 @@ static void usage() {
             return;
         }
         printf("%s\n", msgs[i]);
+    }
+}
+
+static int checkLoginInfo(iFuseOpt_t *opt) {
+    if(opt->host == NULL || strlen(opt->host) == 0) {
+        fprintf(stderr, "iRods Fuse Error: host name is not given\n");
+        return -1;
+    }
+
+    if(opt->port <= 0) {
+        fprintf(stderr, "iRods Fuse Error: port number is not given\n");
+        return -1;
+    }
+
+    if(opt->zone == NULL || strlen(opt->zone) == 0) {
+        fprintf(stderr, "iRods Fuse Error: zone is not given\n");
+        return -1;
+    }
+
+    if(opt->user == NULL || strlen(opt->user) == 0) {
+        fprintf(stderr, "iRods Fuse Error: user is not given\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int checkLoginInfoEnv(rodsEnv *env) {
+    if(strlen(env->rodsHost) == 0) {
+        fprintf(stderr, "iRods Fuse Error: host name is not given\n");
+        return -1;
+    }
+
+    if(env->rodsPort <= 0) {
+        fprintf(stderr, "iRods Fuse Error: port number is not given\n");
+        return -1;
+    }
+
+    if(strlen(env->rodsZone) == 0) {
+        fprintf(stderr, "iRods Fuse Error: zone is not given\n");
+        return -1;
+    }
+
+    if(strlen(env->rodsUserName) == 0) {
+        fprintf(stderr, "iRods Fuse Error: user is not given\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static void syncLoginInfo(iFuseOpt_t *opt, rodsEnv *env) {
+    // opt --> env
+    if(opt->host != NULL) {
+        if(strlen(opt->host) < NAME_LEN) {
+            bzero(env->rodsHost, NAME_LEN);
+            strcpy(env->rodsHost, opt->host);
+        }
+    } else {
+        // env --> opt
+        if(strlen(env->rodsHost) > 0) {
+            opt->host = strdup(env->rodsHost);
+        }
+    }
+
+    if(opt->port > 0) {
+        env->rodsPort = opt->port;
+    } else {
+        // env --> opt
+        opt->port = env->rodsPort;
+    }
+
+    if(opt->zone != NULL) {
+        if(strlen(opt->zone) < NAME_LEN) {
+            bzero(env->rodsZone, NAME_LEN);
+            strcpy(env->rodsZone, opt->zone);
+        }
+    } else {
+        // env --> opt
+        if(strlen(env->rodsZone) > 0) {
+            opt->zone = strdup(env->rodsZone);
+        }
+    }
+
+    if(opt->user != NULL) {
+        if(strlen(opt->user) < NAME_LEN) {
+            bzero(env->rodsUserName, NAME_LEN);
+            strcpy(env->rodsUserName, opt->user);
+        }
+    } else {
+        // env --> opt
+        if(strlen(env->rodsUserName) > 0) {
+            opt->user = strdup(env->rodsUserName);
+        }
+    }
+
+    if(opt->defResource != NULL) {
+        if(strlen(opt->defResource) < NAME_LEN) {
+            bzero(env->rodsDefResource, NAME_LEN);
+            strcpy(env->rodsDefResource, opt->defResource);
+        }
+    } else {
+        // env --> opt
+        if(strlen(env->rodsDefResource) > 0) {
+            opt->defResource = strdup(env->rodsDefResource);
+        }
+    }
+
+    if(opt->workdir != NULL) {
+        if(strlen(opt->workdir) < MAX_NAME_LEN) {
+            bzero(env->rodsCwd, MAX_NAME_LEN);
+            strcpy(env->rodsCwd, opt->workdir);
+        }
+    } else {
+        // env --> opt
+        if(strlen(env->rodsCwd) > 0) {
+            opt->workdir = strdup(env->rodsCwd);
+        }
     }
 }
 

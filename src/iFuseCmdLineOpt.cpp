@@ -141,6 +141,31 @@ void iFuseCmdOptsDestroy() {
         g_Opt.mountpoint = NULL;
     }
 
+    if(g_Opt.host != NULL) {
+        free(g_Opt.host);
+        g_Opt.host = NULL;
+    }
+
+    if(g_Opt.zone != NULL) {
+        free(g_Opt.zone);
+        g_Opt.zone = NULL;
+    }
+
+    if(g_Opt.user != NULL) {
+        free(g_Opt.user);
+        g_Opt.user = NULL;
+    }
+
+    if(g_Opt.password != NULL) {
+        free(g_Opt.password);
+        g_Opt.password = NULL;
+    }
+
+    if(g_Opt.defResource != NULL) {
+        free(g_Opt.defResource);
+        g_Opt.defResource = NULL;
+    }
+
     if(g_Opt.workdir != NULL) {
         free(g_Opt.workdir);
         g_Opt.workdir = NULL;
@@ -306,7 +331,6 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                 } else {
                     g_Opt.preload = false;
                     g_Opt.preloadNumBlocks = 0;
-                    processed = true;
                 }
                 processed = true;
             } else if(strcmp(cmd.command, "preloadblocks") == 0) {
@@ -315,12 +339,57 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                 } else {
                     g_Opt.preload = false;
                     g_Opt.preloadNumBlocks = 0;
-                    processed = true;
                 }
                 processed = true;
             } else if(strcmp(cmd.command, "metadatacachetimeout") == 0) {
                 if(strlen(cmd.value) > 0) {
                     g_Opt.metadataCacheTimeoutSec = atoi(cmd.value);
+                }
+                processed = true;
+            } else if(strcmp(cmd.command, "host") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    char *splitter = strchr(cmd.value, ':');
+                    if(splitter == NULL) {
+                        // no splitter found
+                        g_Opt.host = strdup(cmd.value);
+                    } else {
+                        // has port
+                        g_Opt.host = strndup(cmd.value, splitter - cmd.value);
+                        g_Opt.port = atoi(splitter+1);
+                    }
+                }
+                processed = true;
+            } else if(strcmp(cmd.command, "port") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    g_Opt.port = atoi(cmd.value);
+                }
+                processed = true;
+            } else if(strcmp(cmd.command, "zone") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    g_Opt.zone = strdup(cmd.value);
+                }
+                processed = true;
+            } else if(strcmp(cmd.command, "user") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    char *splitter = strchr(cmd.value, ':');
+                    if(splitter == NULL) {
+                        // no splitter found
+                        g_Opt.user = strdup(cmd.value);
+                    } else {
+                        // has password
+                        g_Opt.user = strndup(cmd.value, splitter - cmd.value);
+                        g_Opt.password = strdup(splitter+1);
+                    }
+                }
+                processed = true;
+            } else if(strcmp(cmd.command, "password") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    g_Opt.password = strdup(cmd.value);
+                }
+                processed = true;
+            } else if(strcmp(cmd.command, "defresource") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    g_Opt.defResource = strdup(cmd.value);
                 }
                 processed = true;
             } else if(strcmp(cmd.command, "ticket") == 0) {
@@ -395,7 +464,7 @@ int iFuseCmdOptsParse(int argc, char **argv) {
     }
 
     optind = 1;
-    while((c = getopt(argc, argv, "hvVdfo:t:w:Z")) != -1) {
+    while((c = getopt(argc, argv, "hvVdfo:H:P:z:u:p:t:w:Z")) != -1) {
         switch(c) {
             case 'h':
                 {
@@ -435,6 +504,60 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                     bzero(buff, MAX_NAME_LEN);
                     sprintf(buff, "-o%s", optarg);
                     iFuseCmdOptsAdd(buff);
+                }
+                break;
+            case 'H':
+                {
+                    // host
+                    if (strlen(optarg) > 0) {
+                        char *splitter = strchr(optarg, ':');
+                        if(splitter == NULL) {
+                            // no splitter found
+                            g_Opt.host = strdup(optarg);
+                        } else {
+                            // has port
+                            g_Opt.host = strndup(optarg, splitter - optarg);
+                            g_Opt.port = atoi(splitter+1);
+                        }
+                    }
+                }
+                break;
+            case 'P':
+                {
+                    // port
+                    if (strlen(optarg) > 0) {
+                        g_Opt.port = atoi(optarg);
+                    }
+                }
+                break;
+            case 'z':
+                {
+                    // zone
+                    if (strlen(optarg) > 0) {
+                        g_Opt.zone = strdup(optarg);
+                    }
+                }
+                break;
+            case 'u':
+                {
+                    // user
+                    char *splitter = strchr(optarg, ':');
+                    if(splitter == NULL) {
+                        // no splitter found
+                        g_Opt.user = strdup(optarg);
+                    } else {
+                        // has password
+                        g_Opt.user = strndup(optarg, splitter - optarg);
+                        g_Opt.password = strdup(splitter+1);
+                    }
+                }
+                break;
+            case 'p':
+                {
+                    // password
+                    if (strlen(optarg) > 0) {
+                        g_Opt.password = strdup(optarg);
+                    }
                 }
                 break;
             case 't':
