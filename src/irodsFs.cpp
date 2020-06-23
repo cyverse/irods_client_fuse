@@ -89,6 +89,11 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    if(myiFuseOpt.mountpoint == NULL || strlen(myiFuseOpt.mountpoint) == 0) {
+        fprintf(stderr, "Mount point is not given\n");
+        return -1;
+    }
+
     status = getRodsEnv(&myRodsEnv);
     if (status < 0) {
         fprintf(stderr, "iRods Fuse abort: getRodsEnv error with status %d\n", status);
