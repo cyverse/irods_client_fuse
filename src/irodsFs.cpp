@@ -319,6 +319,16 @@ static void syncLoginInfo(iFuseOpt_t *opt, rodsEnv *env) {
         }
     }
 
+    // fill rodsHome and rodsCwd
+    if(strlen(env->rodsHome) == 0 && strlen(env->rodsUserName) > 0 && strlen(env->rodsZone ) > 0) {
+        snprintf(env->rodsHome, MAX_NAME_LEN, "/%s/home/%s", env->rodsZone, env->rodsUserName);
+    }
+
+    if(strlen(env->rodsCwd) == 0 && strlen(env->rodsHome) > 0) {
+        rstrcpy(env->rodsCwd, env->rodsHome, MAX_NAME_LEN);
+    }
+
+    // overwrite 
     if(opt->workdir != NULL) {
         if(strlen(opt->workdir) < MAX_NAME_LEN) {
             bzero(env->rodsCwd, MAX_NAME_LEN);

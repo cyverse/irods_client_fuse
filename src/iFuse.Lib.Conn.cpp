@@ -87,7 +87,12 @@ static int _connect(iFuseConn_t *iFuseConn) {
 
         assert(iFuseConn->conn != NULL);
 
-        status = iFuseRodsClientLogin(iFuseConn->conn);
+        if (opt->password != NULL) {
+            status = iFuseRodsClientLoginWithPassword(iFuseConn->conn, opt->password);
+        } else {
+            status = iFuseRodsClientLogin(iFuseConn->conn);
+        }
+
         if (status != 0) {
             iFuseRodsClientDisconnect(iFuseConn->conn);
             iFuseConn->conn = NULL;

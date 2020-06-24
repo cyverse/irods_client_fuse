@@ -13,6 +13,7 @@
 #include "iFuse.Lib.hpp"
 #include "iFuse.Lib.RodsClientAPI.hpp"
 #include "iFuse.Lib.Util.hpp"
+#include "rods.h"
 #include "sockComm.h"
 #include "miscUtil.h"
 #include "ticketAdmin.h"
@@ -221,6 +222,12 @@ int iFuseRodsClientLoginWithPassword(rcComm_t *conn, char* password) {
 
     if(oper == NULL) {
         return SYS_MALLOC_ERR;
+    }
+
+    status = obfSavePw(0, 0, 0, password);
+    if(status != 0) {
+        _endOperationTimeout(oper);
+        return status;
     }
 
     status = clientLogin(conn);
