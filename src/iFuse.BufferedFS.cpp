@@ -1,7 +1,21 @@
 /*** Copyright (c), The Regents of the University of California            ***
  *** For more information please refer to files in the COPYRIGHT directory ***/
-/*** This code is written by Illyoung Choi (iychoi@email.arizona.edu)      ***
- *** funded by iPlantCollaborative (www.iplantcollaborative.org).          ***/
+/*
+    Copyright 2020 The Trustees of University of Arizona and CyVerse
+
+    Licensed under the Apache License, Version 2.0 (the "License" );
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -149,7 +163,7 @@ static int _flushDelta(iFuseFd_t *iFuseFd) {
 
             // apply to caches
             _applyDeltaToCache(iFuseFd->iRodsPath, iFuseBufferCache->buffer, iFuseBufferCache->offset, iFuseBufferCache->size);
-            
+
             // release lock before making a write request
             pthread_rwlock_unlock(&g_BufferCacheLock);
 
@@ -207,20 +221,20 @@ static int _readBlock(iFuseFd_t *iFuseFd, char *buf, unsigned int blockID) {
 
     if(!hasCache) {
         char *blockBuffer = NULL;
-        
+
         // remove
         pthread_rwlock_wrlock(&g_BufferCacheLock);
         it_cachemap = g_CacheMap.find(iFuseFd->fdId);
         if(it_cachemap != g_CacheMap.end()) {
             iFuseBufferCache = it_cachemap->second;
-            
+
             g_CacheMap.erase(it_cachemap);
 
             // release
             _freeBufferCache(iFuseBufferCache);
         }
         pthread_rwlock_unlock(&g_BufferCacheLock);
-        
+
         // read
         status = _newBufferCache(&iFuseBufferCache);
         if(status < 0) {
@@ -439,11 +453,11 @@ static int _releaseAllCache() {
  * Initialize buffer cache manager
  */
 void iFuseBufferedFSInit() {
-   
+
     if(iFuseLibGetOption()->blocksize > 0) {
         g_Blocksize = iFuseLibGetOption()->blocksize;
     }
-   
+
     pthread_rwlockattr_init(&g_BufferCacheLockAttr);
     pthread_rwlock_init(&g_BufferCacheLock, &g_BufferCacheLockAttr);
 }

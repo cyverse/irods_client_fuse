@@ -1,7 +1,21 @@
 /*** Copyright (c), The Regents of the University of California            ***
  *** For more information please refer to files in the COPYRIGHT directory ***/
-/*** This code is rewritten by Illyoung Choi (iychoi@email.arizona.edu)    ***
- *** funded by iPlantCollaborative (www.iplantcollaborative.org).          ***/
+/*
+    Copyright 2020 The Trustees of University of Arizona and CyVerse
+
+    Licensed under the Apache License, Version 2.0 (the "License" );
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -328,7 +342,7 @@ static void syncLoginInfo(iFuseOpt_t *opt, rodsEnv *env) {
         rstrcpy(env->rodsCwd, env->rodsHome, MAX_NAME_LEN);
     }
 
-    // overwrite 
+    // overwrite
     if(opt->workdir != NULL) {
         if(strlen(opt->workdir) < MAX_NAME_LEN) {
             bzero(env->rodsCwd, MAX_NAME_LEN);

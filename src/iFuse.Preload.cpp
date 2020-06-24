@@ -1,7 +1,21 @@
 /*** Copyright (c), The Regents of the University of California            ***
  *** For more information please refer to files in the COPYRIGHT directory ***/
-/*** This code is written by Illyoung Choi (iychoi@email.arizona.edu)      ***
- *** funded by iPlantCollaborative (www.iplantcollaborative.org).          ***/
+/*
+    Copyright 2020 The Trustees of University of Arizona and CyVerse
+
+    Licensed under the Apache License, Version 2.0 (the "License" );
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -31,7 +45,7 @@ static int g_preloadNumBlocks = IFUSE_PRELOAD_PBLOCK_NUM;
 // use a thread pool to enforce a max num. of connections
 // make a active/idle queue for threads
 // make a incomplete/complete queue for blocks
-// 
+//
 static int _newPreloadPBlock(const char *iRodsPath, iFusePreloadPBlock_t **iFusePreloadPBlock) {
     iFusePreloadPBlock_t *tmpIFusePreloadPBlock = NULL;
 

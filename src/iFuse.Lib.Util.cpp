@@ -1,7 +1,21 @@
 /*** Copyright (c), The Regents of the University of California            ***
  *** For more information please refer to files in the COPYRIGHT directory ***/
-/*** This code is rewritten by Illyoung Choi (iychoi@email.arizona.edu)    ***
- *** funded by iPlantCollaborative (www.iplantcollaborative.org).          ***/
+/*
+    Copyright 2020 The Trustees of University of Arizona and CyVerse
+
+    Licensed under the Apache License, Version 2.0 (the "License" );
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -42,7 +56,7 @@ void iFuseLibGetStrCurrentTime(char *buff) {
     time_t cur = iFuseLibGetCurrentTime();
     struct tm curtm;
     localtime_r(&cur, &curtm);
-    
+
     asctime_r(&curtm, buff);
     buff[strlen(buff) - 1] = 0;
 }
@@ -50,7 +64,7 @@ void iFuseLibGetStrCurrentTime(char *buff) {
 void iFuseLibGetStrTime(time_t time, char *buff) {
     struct tm curtm;
     localtime_r(&time, &curtm);
-    
+
     asctime_r(&curtm, buff);
     buff[strlen(buff) - 1] = 0;
 }
@@ -93,22 +107,22 @@ int iFuseLibJoinPath(const char *dir, const char *file, char *destPath, unsigned
     const std::string fileString(file);
     int file_start = 0;
     int dir_len = dirString.size();
-    
+
     if(fileString.at(0) == '/') {
         file_start = 1;
     }
-    
+
     if(dirString.at(dir_len - 1) == '/') {
         dir_len -= 1;
     }
-    
+
     const std::string fileString2 = fileString.substr(file_start);
     const std::string dirString2 = dirString.substr(0, dir_len);
-    
+
     if(dirString2.size() + fileString2.size() >= maxDestPathLen) {
         return -ENOBUFS;
     }
-    
+
     unsigned int offset = 0;
     rstrcpy(destPath, dirString2.c_str(), maxDestPathLen);
     offset += dirString2.size();
@@ -126,7 +140,7 @@ int iFuseLibGetFilename(const char *srcPath, char *file, unsigned int maxFileLen
     if(status != 0) {
         return status;
     }
-    
+
     if(strlen(file) != 0) {
         return 0;
     }
@@ -144,9 +158,9 @@ void iFuseLibLogUnlock() {
 void iFuseLibLogToFile(int level, const char *formatStr, ...) {
     va_list args;
     va_start(args, formatStr);
-    
+
     FILE *logFile;
-    
+
     logFile = fopen(IFUSE_LIB_LOG_OUT_FILE_PATH, "a");
     if(logFile != NULL) {
         if(level == 7) {
@@ -160,21 +174,21 @@ void iFuseLibLogToFile(int level, const char *formatStr, ...) {
         }
         vfprintf(logFile, formatStr, args);
         fprintf(logFile, "\n");
-        
+
         fflush(logFile);
         fsync(fileno(logFile));
         fclose(logFile);
     }
-    
+
     va_end(args);
 }
 
 void iFuseLibLogErrorToFile(int level, int errCode, char *formatStr, ...) {
     va_list args;
     va_start(args, formatStr);
-    
+
     FILE *logFile;
-    
+
     logFile = fopen(IFUSE_LIB_LOG_OUT_FILE_PATH, "a");
     if(logFile != NULL) {
         if(level == 7) {
@@ -188,11 +202,11 @@ void iFuseLibLogErrorToFile(int level, int errCode, char *formatStr, ...) {
         }
         vfprintf(logFile, formatStr, args);
         fprintf(logFile, "\n");
-        
+
         fflush(logFile);
         fsync(fileno(logFile));
         fclose(logFile);
     }
-    
+
     va_end(args);
 }

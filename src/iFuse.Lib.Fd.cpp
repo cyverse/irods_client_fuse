@@ -1,7 +1,21 @@
 /*** Copyright (c), The Regents of the University of California            ***
  *** For more information please refer to files in the COPYRIGHT directory ***/
-/*** This code is rewritten by Illyoung Choi (iychoi@email.arizona.edu)    ***
- *** funded by iPlantCollaborative (www.iplantcollaborative.org).          ***/
+/*
+    Copyright 2020 The Trustees of University of Arizona and CyVerse
+
+    Licensed under the Apache License, Version 2.0 (the "License" );
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -32,32 +46,32 @@ static unsigned long g_FdIDGen;
 static unsigned long g_DdIDGen;
 
 /*
- * Lock order : 
+ * Lock order :
  * - g_AssignedFdLock or g_AssignedDirLock
  * - iFuseFd_t or iFuseDir_t
  */
 
 static unsigned long _genNextFdID() {
     unsigned long newId;
-    
+
     pthread_rwlock_wrlock(&g_IDGenLock);
-    
+
     newId = g_FdIDGen++;
-    
+
     pthread_rwlock_unlock(&g_IDGenLock);
-    
+
     return newId;
 }
 
 static unsigned long _genNextDdID() {
     unsigned long newId;
-    
+
     pthread_rwlock_wrlock(&g_IDGenLock);
-    
+
     newId = g_DdIDGen++;
-    
+
     pthread_rwlock_unlock(&g_IDGenLock);
-    
+
     return newId;
 }
 
@@ -65,15 +79,15 @@ static int _closeFd(iFuseFd_t *iFuseFd) {
     int status = 0;
     openedDataObjInp_t dataObjCloseInp;
     iFuseConn_t *iFuseConn = NULL;
-    
+
     assert(iFuseFd != NULL);
-    
+
     pthread_rwlock_wrlock(&iFuseFd->lock);
-    
+
     if(iFuseFd->fd > 0 && iFuseFd->conn != NULL) {
         iFuseConn = iFuseFd->conn;
         iFuseConnLock(iFuseConn);
-        
+
         bzero(&dataObjCloseInp, sizeof (openedDataObjInp_t));
         dataObjCloseInp.l1descInx = iFuseFd->fd;
 
@@ -81,7 +95,7 @@ static int _closeFd(iFuseFd_t *iFuseFd) {
         iFuseConnUpdateLastActTime(iFuseConn, false);
         if (status < 0) {
             if (iFuseRodsClientReadMsgError(status)) {
-                // reconnect and retry 
+                // reconnect and retry
                 if(iFuseConnReconnect(iFuseConn) < 0) {
                     iFuseLibLogError(LOG_ERROR, status, "iFuseFdClose: iFuseConnReconnect of %s (%d) error",
                         iFuseFd->iRodsPath, iFuseFd->fd);
@@ -100,12 +114,12 @@ static int _closeFd(iFuseFd_t *iFuseFd) {
 
         iFuseConnUnlock(iFuseConn);
     }
-    
+
     iFuseFd->conn = NULL;
     iFuseFd->fd = 0;
     iFuseFd->openFlag = 0;
     iFuseFd->lastFilePointer = -1;
-    
+
     pthread_rwlock_unlock(&iFuseFd->lock);
     return status;
 }
@@ -113,9 +127,9 @@ static int _closeFd(iFuseFd_t *iFuseFd) {
 static int _closeDir(iFuseDir_t *iFuseDir) {
     int status = 0;
     iFuseConn_t *iFuseConn = NULL;
-    
+
     assert(iFuseDir != NULL);
-    
+
     pthread_rwlock_wrlock(&iFuseDir->lock);
 
     if(iFuseDir->handle != NULL && iFuseDir->conn != NULL) {
@@ -124,7 +138,7 @@ static int _closeDir(iFuseDir_t *iFuseDir) {
         status = iFuseRodsClientCloseCollection(iFuseDir->handle);
         if (status < 0) {
             if (iFuseRodsClientReadMsgError(status)) {
-                // reconnect and retry 
+                // reconnect and retry
                 if(iFuseConnReconnect(iFuseConn) < 0) {
                     iFuseLibLogError(LOG_ERROR, status, "iFuseDirClose: iFuseConnReconnect of %s error",
                         iFuseDir->iRodsPath);
@@ -143,26 +157,26 @@ static int _closeDir(iFuseDir_t *iFuseDir) {
 
         iFuseConnUnlock(iFuseConn);
     }
-    
+
     iFuseDir->conn = NULL;
-    
+
     if(iFuseDir->handle != NULL) {
         free(iFuseDir->handle);
         iFuseDir->handle = NULL;
     }
-    
+
     pthread_rwlock_unlock(&iFuseDir->lock);
     return status;
 }
 
 static int _freeFd(iFuseFd_t *iFuseFd) {
     assert(iFuseFd != NULL);
-    
+
     _closeFd(iFuseFd);
-    
+
     pthread_rwlock_destroy(&iFuseFd->lock);
     pthread_rwlockattr_destroy(&iFuseFd->lockAttr);
-    
+
     if(iFuseFd->iRodsPath != NULL) {
         free(iFuseFd->iRodsPath);
         iFuseFd->iRodsPath = NULL;
@@ -174,27 +188,27 @@ static int _freeFd(iFuseFd_t *iFuseFd) {
 
 static int _freeDir(iFuseDir_t *iFuseDir) {
     assert(iFuseDir != NULL);
-    
+
     _closeDir(iFuseDir);
-    
+
     pthread_rwlock_destroy(&iFuseDir->lock);
     pthread_rwlockattr_destroy(&iFuseDir->lockAttr);
-    
+
     if(iFuseDir->iRodsPath != NULL) {
         free(iFuseDir->iRodsPath);
         iFuseDir->iRodsPath = NULL;
     }
-    
+
     if(iFuseDir->handle != NULL) {
         free(iFuseDir->handle);
         iFuseDir->handle = NULL;
     }
-    
+
     if(iFuseDir->cachedEntries != NULL) {
         free(iFuseDir->cachedEntries);
         iFuseDir->cachedEntries = NULL;
     }
-    
+
     iFuseDir->cachedEntryBufferLen = 0;
 
     free(iFuseDir);
@@ -203,17 +217,17 @@ static int _freeDir(iFuseDir_t *iFuseDir) {
 
 static int _closeAllFd() {
     iFuseFd_t *iFuseFd;
-    
+
     pthread_rwlock_wrlock(&g_AssignedFdLock);
 
     // close all opened file descriptors
     while(!g_AssignedFd.empty()) {
         iFuseFd = g_AssignedFd.front();
         g_AssignedFd.pop_front();
-        
+
         _freeFd(iFuseFd);
     }
-    
+
     pthread_rwlock_unlock(&g_AssignedFdLock);
     return 0;
 }
@@ -222,15 +236,15 @@ static int _closeAllDir() {
     iFuseDir_t *iFuseDir;
 
     pthread_rwlock_wrlock(&g_AssignedDirLock);
-    
+
     // close all opened dir descriptors
     while(!g_AssignedDir.empty()) {
         iFuseDir = g_AssignedDir.front();
         g_AssignedDir.pop_front();
-        
+
         _freeDir(iFuseDir);
     }
-    
+
     pthread_rwlock_unlock(&g_AssignedDirLock);
     return 0;
 }
@@ -241,14 +255,14 @@ static int _closeAllDir() {
 void iFuseFdInit() {
     pthread_rwlockattr_init(&g_AssignedFdLockAttr);
     pthread_rwlock_init(&g_AssignedFdLock, &g_AssignedFdLockAttr);
-    
+
     g_FdIDGen = 0;
-    
+
     pthread_rwlockattr_init(&g_AssignedDirLockAttr);
     pthread_rwlock_init(&g_AssignedDirLock, &g_AssignedDirLockAttr);
-    
+
     g_DdIDGen = 0;
-    
+
     pthread_rwlockattr_init(&g_IDGenLockAttr);
     pthread_rwlock_init(&g_IDGenLock, &g_IDGenLockAttr);
 }
@@ -257,23 +271,23 @@ void iFuseFdInit() {
  * Destroy file descriptor manager
  */
 void iFuseFdDestroy() {
-    
+
     // file
     g_FdIDGen = 0;
-    
+
     _closeAllFd();
-    
+
     pthread_rwlock_destroy(&g_AssignedFdLock);
     pthread_rwlockattr_destroy(&g_AssignedFdLockAttr);
-    
+
     // dir
     g_DdIDGen = 0;
-    
+
     _closeAllDir();
-    
+
     pthread_rwlock_destroy(&g_AssignedDirLock);
     pthread_rwlockattr_destroy(&g_AssignedDirLockAttr);
-    
+
     pthread_rwlock_destroy(&g_IDGenLock);
     pthread_rwlockattr_destroy(&g_IDGenLockAttr);
 }
@@ -290,22 +304,22 @@ int iFuseFdOpen(iFuseFd_t **iFuseFd, iFuseConn_t *iFuseConn, const char* iRodsPa
     assert(iFuseFd != NULL);
     assert(iFuseConn != NULL);
     assert(iRodsPath != NULL);
-    
+
     *iFuseFd = NULL;
 
     iFuseConnLock(iFuseConn);
-    
+
     bzero(&dataObjOpenInp, sizeof ( dataObjInp_t));
     dataObjOpenInp.openFlags = openFlag;
     rstrcpy(dataObjOpenInp.objPath, iRodsPath, MAX_NAME_LEN);
 
     assert(iFuseConn->conn != NULL);
-    
+
     fd = iFuseRodsClientDataObjOpen(iFuseConn->conn, &dataObjOpenInp);
     iFuseConnUpdateLastActTime(iFuseConn, false);
     if (fd <= 0) {
         if (iFuseRodsClientReadMsgError(fd)) {
-            // reconnect and retry 
+            // reconnect and retry
             if(iFuseConnReconnect(iFuseConn) < 0) {
                 iFuseLibLogError(LOG_ERROR, fd, "iFuseFdOpen: iFuseConnReconnect of %s error, status = %d",
                     iRodsPath, fd);
@@ -327,31 +341,31 @@ int iFuseFdOpen(iFuseFd_t **iFuseFd, iFuseConn_t *iFuseConn, const char* iRodsPa
             return -ENOENT;
         }
     }
-    
+
     iFuseConnUnlock(iFuseConn);
-    
+
     tmpIFuseDesc = (iFuseFd_t *) calloc(1, sizeof ( iFuseFd_t));
     if (tmpIFuseDesc == NULL) {
         *iFuseFd = NULL;
         return SYS_MALLOC_ERR;
     }
-    
+
     tmpIFuseDesc->fdId = _genNextFdID();
     tmpIFuseDesc->conn = iFuseConn;
     tmpIFuseDesc->fd = fd;
     tmpIFuseDesc->iRodsPath = strdup(iRodsPath);
     tmpIFuseDesc->openFlag = openFlag;
     tmpIFuseDesc->lastFilePointer = -1;
-    
+
     pthread_rwlockattr_init(&tmpIFuseDesc->lockAttr);
     pthread_rwlock_init(&tmpIFuseDesc->lock, &tmpIFuseDesc->lockAttr);
-    
+
     *iFuseFd = tmpIFuseDesc;
-    
+
     pthread_rwlock_wrlock(&g_AssignedFdLock);
-    
+
     g_AssignedFd.push_back(tmpIFuseDesc);
-    
+
     pthread_rwlock_unlock(&g_AssignedFdLock);
     return status;
 }
@@ -365,7 +379,7 @@ int iFuseFdReopen(iFuseFd_t *iFuseFd) {
     dataObjInp_t dataObjOpenInp;
     iFuseConn_t *iFuseConn = NULL;
     int fd;
-    
+
     assert(iFuseFd != NULL);
     assert(iFuseFd->conn != NULL);
     assert(iFuseFd->fd > 0);
@@ -382,7 +396,7 @@ int iFuseFdReopen(iFuseFd_t *iFuseFd) {
     iFuseConnUpdateLastActTime(iFuseConn, false);
     if (status < 0) {
         if (iFuseRodsClientReadMsgError(status)) {
-            // reconnect and retry 
+            // reconnect and retry
             if(iFuseConnReconnect(iFuseConn) < 0) {
                 iFuseLibLogError(LOG_ERROR, status, "iFuseFdReopen: iFuseConnReconnect of %s (%d) error",
                     iFuseFd->iRodsPath, iFuseFd->fd);
@@ -398,13 +412,13 @@ int iFuseFdReopen(iFuseFd_t *iFuseFd) {
                 iFuseFd->iRodsPath, iFuseFd->fd);
         }
     }
-    
+
     if(status < 0) {
         iFuseConnUnlock(iFuseConn);
         pthread_rwlock_unlock(&iFuseFd->lock);
         return status;
     }
-    
+
     iFuseFd->lastFilePointer = -1;
 
     bzero(&dataObjOpenInp, sizeof ( dataObjInp_t));
@@ -412,12 +426,12 @@ int iFuseFdReopen(iFuseFd_t *iFuseFd) {
     rstrcpy(dataObjOpenInp.objPath, iFuseFd->iRodsPath, MAX_NAME_LEN);
 
     assert(iFuseConn->conn != NULL);
-    
+
     fd = iFuseRodsClientDataObjOpen(iFuseConn->conn, &dataObjOpenInp);
     iFuseConnUpdateLastActTime(iFuseConn, false);
     if (fd <= 0) {
         if (iFuseRodsClientReadMsgError(fd)) {
-            // reconnect and retry 
+            // reconnect and retry
             if(iFuseConnReconnect(iFuseConn) < 0) {
                 iFuseLibLogError(LOG_ERROR, fd, "iFuseFdReopen: iFuseConnReconnect of %s error, status = %d",
                     iFuseFd->iRodsPath, fd);
@@ -442,11 +456,11 @@ int iFuseFdReopen(iFuseFd_t *iFuseFd) {
             return -ENOENT;
         }
     }
-    
+
     iFuseFd->fd = fd;
-    
+
     iFuseConnUnlock(iFuseConn);
-    
+
     pthread_rwlock_unlock(&iFuseFd->lock);
     return status;
 }
@@ -462,19 +476,19 @@ int iFuseDirOpen(iFuseDir_t **iFuseDir, iFuseConn_t *iFuseConn, const char* iRod
     assert(iFuseDir != NULL);
     assert(iFuseConn != NULL);
     assert(iRodsPath != NULL);
-    
+
     *iFuseDir = NULL;
 
     iFuseConnLock(iFuseConn);
-    
+
     bzero(&collHandle, sizeof ( collHandle_t));
-    
+
     assert(iFuseConn->conn != NULL);
-    
+
     status = iFuseRodsClientOpenCollection(iFuseConn->conn, (char*) iRodsPath, 0, &collHandle);
     if (status < 0) {
         if (iFuseRodsClientReadMsgError(status)) {
-            // reconnect and retry 
+            // reconnect and retry
             if(iFuseConnReconnect(iFuseConn) < 0) {
                 iFuseLibLogError(LOG_ERROR, status, "iFuseDirOpen: iFuseConnReconnect of %s error, status = %d",
                     iRodsPath, status);
@@ -497,15 +511,15 @@ int iFuseDirOpen(iFuseDir_t **iFuseDir, iFuseConn_t *iFuseConn, const char* iRod
             return -ENOENT;
         }
     }
-    
+
     iFuseConnUnlock(iFuseConn);
-    
+
     tmpIFuseDesc = (iFuseDir_t *) calloc(1, sizeof ( iFuseDir_t));
     if (tmpIFuseDesc == NULL) {
         *iFuseDir = NULL;
         return SYS_MALLOC_ERR;
     }
-    
+
     tmpIFuseDesc->ddId = _genNextDdID();
     tmpIFuseDesc->conn = iFuseConn;
     tmpIFuseDesc->iRodsPath = strdup(iRodsPath);
@@ -514,18 +528,18 @@ int iFuseDirOpen(iFuseDir_t **iFuseDir, iFuseConn_t *iFuseConn, const char* iRod
         _freeDir(tmpIFuseDesc);
         return SYS_MALLOC_ERR;
     }
-    
+
     memcpy(tmpIFuseDesc->handle, &collHandle, sizeof(collHandle_t));
-    
+
     pthread_rwlockattr_init(&tmpIFuseDesc->lockAttr);
     pthread_rwlock_init(&tmpIFuseDesc->lock, &tmpIFuseDesc->lockAttr);
-    
+
     *iFuseDir = tmpIFuseDesc;
-    
+
     pthread_rwlock_wrlock(&g_AssignedDirLock);
-    
+
     g_AssignedDir.push_back(tmpIFuseDesc);
-    
+
     pthread_rwlock_unlock(&g_AssignedDirLock);
     return status;
 }
@@ -539,7 +553,7 @@ int iFuseDirOpenWithCache(iFuseDir_t **iFuseDir, const char* iRodsPath, const ch
 
     assert(iFuseDir != NULL);
     assert(iRodsPath != NULL);
-    
+
     *iFuseDir = NULL;
 
     tmpIFuseDesc = (iFuseDir_t *) calloc(1, sizeof ( iFuseDir_t));
@@ -548,7 +562,7 @@ int iFuseDirOpenWithCache(iFuseDir_t **iFuseDir, const char* iRodsPath, const ch
         pthread_rwlock_unlock(&g_AssignedDirLock);
         return SYS_MALLOC_ERR;
     }
-    
+
     tmpIFuseDesc->ddId = _genNextDdID();
     tmpIFuseDesc->conn = NULL;
     tmpIFuseDesc->iRodsPath = strdup(iRodsPath);
@@ -563,16 +577,16 @@ int iFuseDirOpenWithCache(iFuseDir_t **iFuseDir, const char* iRodsPath, const ch
     }
     memcpy(tmpIFuseDesc->cachedEntries, cachedEntries, entryBufferLen);
     tmpIFuseDesc->cachedEntryBufferLen = entryBufferLen;
-    
+
     pthread_rwlockattr_init(&tmpIFuseDesc->lockAttr);
     pthread_rwlock_init(&tmpIFuseDesc->lock, &tmpIFuseDesc->lockAttr);
-    
+
     *iFuseDir = tmpIFuseDesc;
-    
+
     pthread_rwlock_wrlock(&g_AssignedDirLock);
-    
+
     g_AssignedDir.push_back(tmpIFuseDesc);
-    
+
     pthread_rwlock_unlock(&g_AssignedDirLock);
     return status;
 }
@@ -582,16 +596,16 @@ int iFuseDirOpenWithCache(iFuseDir_t **iFuseDir, const char* iRodsPath, const ch
  */
 int iFuseFdClose(iFuseFd_t *iFuseFd) {
     int status = 0;
-    
+
     assert(iFuseFd != NULL);
     assert(iFuseFd->conn != NULL);
     assert(iFuseFd->fd > 0);
-    
+
     pthread_rwlock_wrlock(&g_AssignedFdLock);
-    
+
     g_AssignedFd.remove(iFuseFd);
     status = _freeFd(iFuseFd);
-    
+
     pthread_rwlock_unlock(&g_AssignedFdLock);
     return status;
 }
@@ -601,14 +615,14 @@ int iFuseFdClose(iFuseFd_t *iFuseFd) {
  */
 int iFuseDirClose(iFuseDir_t *iFuseDir) {
     int status = 0;
-    
+
     assert(iFuseDir != NULL);
-    
+
     pthread_rwlock_wrlock(&g_AssignedDirLock);
-    
+
     g_AssignedDir.remove(iFuseDir);
     status = _freeDir(iFuseDir);
-    
+
     pthread_rwlock_unlock(&g_AssignedDirLock);
     return status;
 }
@@ -618,7 +632,7 @@ int iFuseDirClose(iFuseDir_t *iFuseDir) {
  */
 void iFuseFdLock(iFuseFd_t *iFuseFd) {
     assert(iFuseFd != NULL);
-    
+
     pthread_rwlock_wrlock(&iFuseFd->lock);
 }
 
@@ -627,7 +641,7 @@ void iFuseFdLock(iFuseFd_t *iFuseFd) {
  */
 void iFuseDirLock(iFuseDir_t *iFuseDir) {
     assert(iFuseDir != NULL);
-    
+
     pthread_rwlock_wrlock(&iFuseDir->lock);
 }
 
@@ -636,7 +650,7 @@ void iFuseDirLock(iFuseDir_t *iFuseDir) {
  */
 void iFuseFdUnlock(iFuseFd_t *iFuseFd) {
     assert(iFuseFd != NULL);
-    
+
     pthread_rwlock_unlock(&iFuseFd->lock);
 }
 
@@ -645,6 +659,6 @@ void iFuseFdUnlock(iFuseFd_t *iFuseFd) {
  */
 void iFuseDirUnlock(iFuseDir_t *iFuseDir) {
     assert(iFuseDir != NULL);
-    
+
     pthread_rwlock_unlock(&iFuseDir->lock);
 }
