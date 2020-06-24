@@ -16,8 +16,10 @@
 
 
 import os
-import os.path
 import sys
+import subprocess
+import shlex
+import time
 
 from urllib.parse import urlparse
 
@@ -28,30 +30,43 @@ from urllib.parse import urlparse
 #[3] -o
 #[4] rw
 
+ENV_FILE = "/etc/irodsfs_env"
+
+
+def read_environment():
+    if os.path.exists(ENV_FILE):
+        with open(ENV_FILE, "r") as fh:
+            arr = []
+            for line in fh.readlines():
+                 if not line.startswith("#"):
+                     kv = line.split("=")
+                     kv_arr = []
+                     kv_arr.append(kv[0].strip(" \n\t\'\""))
+                     kv_arr.append(kv[1].strip(" \n\t\'\""))
+                     arr.append(tuple(kv_arr))
+
+
+            vars_dict = dict(arr)
+
+        #print(vars_dict)
+        os.environ.update(vars_dict)
+
+
 def which(program):
     pathenv = os.getenv('PATH')
-    if pathenv:
-        for p in pathenv.split(os.path.pathsep):
-            binpath = os.path.join(p, program)
-            if os.path.exists(binpath) and os.access(binpath, os.X_OK):
-                return binpath
+    if not pathenv:
+        pathenv = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+    for p in pathenv.split(os.path.pathsep):
+        binpath = os.path.join(p, program)
+        if os.path.exists(binpath) and os.access(binpath, os.X_OK):
+            return binpath
     return None
 
 
-def run_command_with_output(command):
-    try:
-        process = subprocess.Popen(shlex.split(command), stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        while True:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                print(output.strip())
-        rc = process.poll()
-        return True
-    except subprocess.CalledProcessError as err:
-        print("error code - %d %s" % (err.returncode, err.output), file=sys.stderr)
-    return False
+def run_command(command_argv):
+    os.spawnvpe(os.P_NOWAIT, command_argv[0], command_argv, os.environ)
+    time.sleep(1)
 
 
 def parse_login_info(login_info_url):
@@ -84,6 +99,8 @@ def main(argv):
     if len(argv) < 2:
         print("Arguments not given correctly (given = %d)" % len(argv), file=sys.stderr)
         sys.exit(1)
+
+    read_environment()
 
     irodsBin = which("irodsFs")
 
@@ -137,9 +154,8 @@ def main(argv):
     mountPoint = mountInfo[1]
 
     command = "%s %s -H %s -z %s -u %s %s" % (irodsBin, " ".join(options), host, zone, user, mountPoint)
-    status = run_command_with_output(command)
-    if not status:
-        sys.exit(1)
+    #print("executing > %s" % command)
+    run_command(command.split())
 
 
 if __name__ == "__main__":
