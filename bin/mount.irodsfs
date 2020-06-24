@@ -1,0 +1,131 @@
+#! /usr/bin/env python3
+
+import os
+import os.path
+import sys
+
+from urllib.parse import urlparse
+
+# mount -t irodsfs URL /opt/mount
+#[0] /sbin/mount.irodsfs
+#[1] URL
+#[2] /opt/mount
+#[3] -o
+#[4] rw
+
+def which(program):
+    pathenv = os.getenv('PATH')
+    if pathenv:
+        for p in pathenv.split(os.path.pathsep):
+            binpath = os.path.join(p, program)
+            if os.path.exists(binpath) and os.access(binpath, os.X_OK):
+                return binpath
+    return None
+
+
+def run_command_with_output(command):
+    try:
+        process = subprocess.Popen(shlex.split(command), stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+        rc = process.poll()
+        return True
+    except subprocess.CalledProcessError as err:
+        print("error code - %d %s" % (err.returncode, err.output), file=sys.stderr)
+    return False
+
+
+def parse_login_info(login_info_url):
+    o = urlparse(login_info_url)
+    if o.scheme not in ["http", "https", "irods"]:
+        return None, None, None
+
+    host = o.hostname
+    if not o.port:
+        host += ":1247"
+    else:
+        host += (":%d" % o.port)
+
+    zone = None
+    if o.path:
+        p = o.path.lstrip("/")
+        if p:
+            paths = p.split("/")
+            if len(paths) > 0:
+                zone = paths[0]
+
+    user = None
+    if o.username and o.password:
+        user = "%s:%s" % (o.username, o.password)
+
+    return host, zone, user
+
+
+def main(argv):
+    if len(argv) < 2:
+        print("Arguments not given correctly (given = %d)" % len(argv), file=sys.stderr)
+        sys.exit(1)
+
+    irodsBin = which("irodsFs")
+
+    if not irodsBin:
+        print("Cannot find irodsFs (iRODS FUSE) installed from PATH environment", file=sys.stderr)
+        sys.exit(1)
+
+    options = []
+    skipCount = 0
+
+    mountInfo = []
+
+    for idx, arg in enumerate(argv):
+        if idx == 0:
+            continue
+
+        if skipCount > 0:
+            skipCount -= 1
+            continue
+
+        if arg == "-o":
+            # option
+            fuseOptions = argv[idx+1].split(",")
+            for fo in fuseOptions:
+                options.append("-o")
+                options.append(fo)
+
+            skipCount = 1
+        else:
+            mountInfo.append(arg)
+
+    if len(mountInfo) != 2:
+        print("Mount arguments not given correctly", file=sys.stderr)
+        sys.exit(1)
+
+
+    host, zone, user = parse_login_info(mountInfo[0])
+    if not host:
+        print("iRODS HOST is not given", file=sys.stderr)
+        sys.exit(1)
+
+    if not zone:
+        print("iRODS ZONE is not given", file=sys.stderr)
+        sys.exit(1)
+
+    if not user:
+        print("iRODS USER is not given", file=sys.stderr)
+        sys.exit(1)
+
+
+    mountPoint = mountInfo[1]
+
+    command = "%s %s -H %s -z %s -u %s %s" % (irodsBin, " ".join(options), host, zone, user, mountPoint)
+    status = run_command_with_output(command)
+    if not status:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
