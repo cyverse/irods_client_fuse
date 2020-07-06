@@ -81,18 +81,21 @@ def parse_login_info(login_info_url):
         host += (":%d" % o.port)
 
     zone = None
+    workingdir = None
     if o.path:
         p = o.path.lstrip("/")
         if p:
             paths = p.split("/")
             if len(paths) > 0:
                 zone = paths[0]
+                # workingdir includes zone in front
+                workingdir = "/" + "/".join(paths)
 
     user = None
     if o.username and o.password:
         user = "%s:%s" % (o.username, o.password)
 
-    return host, zone, user
+    return host, zone, user, workingdir
 
 
 def main(argv):
@@ -137,7 +140,7 @@ def main(argv):
         sys.exit(1)
 
 
-    host, zone, user = parse_login_info(mountInfo[0])
+    host, zone, user, workingdir = parse_login_info(mountInfo[0])
     if not host:
         print("iRODS HOST is not given", file=sys.stderr)
         sys.exit(1)
@@ -149,6 +152,10 @@ def main(argv):
     if not user:
         print("iRODS USER is not given", file=sys.stderr)
         sys.exit(1)
+
+    if workingdir:
+        options.append("--workdir")
+        options.append(workingdir)
 
 
     mountPoint = mountInfo[1]
