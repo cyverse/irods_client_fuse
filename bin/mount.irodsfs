@@ -66,7 +66,7 @@ def which(program):
 
 def run_command(command_argv):
     os.spawnvpe(os.P_NOWAIT, command_argv[0], command_argv, os.environ)
-    time.sleep(1)
+    time.sleep(5)
 
 
 def parse_login_info(login_info_url):
