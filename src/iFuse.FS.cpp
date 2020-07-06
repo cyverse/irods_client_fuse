@@ -671,7 +671,7 @@ int iFuseFsCreate(const char *iRodsPath, mode_t mode) {
 
     bzero(&dataObjInp, sizeof(dataObjInp_t));
     rstrcpy(dataObjInp.objPath, iRodsPath, MAX_NAME_LEN);
-    if (strlen(iFuseLibGetOption()->defResource) > 0) {
+    if (iFuseLibGetOption()->defResource != NULL && strlen(iFuseLibGetOption()->defResource) > 0) {
         addKeyVal(&dataObjInp.condInput, RESC_NAME_KW, iFuseLibGetOption()->defResource);
     }
 
