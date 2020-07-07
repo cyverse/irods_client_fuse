@@ -23,7 +23,7 @@ import time
 
 from urllib.parse import urlparse
 
-# mount -t irodsfs URL /opt/mount
+# mount -t irodsfs -o k=v URL /opt/mount
 #[0] /sbin/mount.irodsfs
 #[1] URL
 #[2] /opt/mount
@@ -128,8 +128,15 @@ def main(argv):
             # option
             fuseOptions = argv[idx+1].split(",")
             for fo in fuseOptions:
-                options.append("-o")
-                options.append(fo)
+                fokv = fo.split("=")
+                if len(fokv) == 1:
+                    # -o xxx
+                    options.append("-o")
+                    options.append(fokv[0])
+                elif len(fokv) == 2:
+                    # -o kk=vv
+                    options.append("--%s" % fokv[0])
+                    options.append(fokv[1])
 
             skipCount = 1
         else:
