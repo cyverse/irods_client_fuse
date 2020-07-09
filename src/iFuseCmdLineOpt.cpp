@@ -401,6 +401,27 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                     g_Opt.password = strdup(cmd.value);
                 }
                 processed = true;
+            } else if(strcmp(cmd.command, "passwordstdin") == 0) {
+                char inbuf[MAX_PASSWORD_INPUT_LEN*2];
+                printf("Enter your current iRODS password:");
+                const char *fgets_return = fgets(inbuf, MAX_PASSWORD_INPUT_LEN, stdin);
+                if(fgets_return != inbuf || strlen(inbuf) < 2) {
+                    // Either error or end-of-file encountered.
+                    // If anything was actually entered, the length
+                    // will be 2 - to include the '\n'.
+                    // NO_PASSWORD_ENTERED
+                } else {
+                    if(strlen(inbuf) > MAX_PASSWORD_INPUT_LEN - 8) {
+                        // exceed length
+                    } else {
+                        if(inbuf[i - 1] == '\n') {
+                            inbuf[i - 1] = '\0';    /* remove trailing \n */
+                        }
+
+                        g_Opt.password = strdup(inbuf);
+                    }
+                }
+                processed = true;
             } else if(strcmp(cmd.command, "defresource") == 0) {
                 if(strlen(cmd.value) > 0) {
                     g_Opt.defResource = strdup(cmd.value);

@@ -125,6 +125,16 @@ int main(int argc, char **argv) {
     // sync rodsEnv and irods fuse opts
     syncLoginInfo(&myiFuseOpt, &myRodsEnv);
 
+    // save password
+    if (myiFuseOpt.password != NULL) {
+        status = obfSavePw(0, 0, 0, myiFuseOpt.password);
+        if(status != 0) {
+            fprintf(stderr, "iRods Fuse abort: password save failed\n");
+            iFuseCmdOptsDestroy();
+            return 1;
+        }
+    }
+
     // check login info
     status = checkLoginInfo(&myiFuseOpt);
     if (status != 0) {
@@ -204,6 +214,7 @@ static void usage() {
         " -p, --password                   Use given password",
         " -t, --ticket <ticket_no>         Use ticket for authentication",
         " -w, --workdir <irods_dir>        Use given irods dir as a work dir",
+        " --passwordstdin                  Take password from stdin",
         " --nocache                        Disable all caching features (Buffered IO, Preload, Metadata Cache)",
         " --nopreload                      Disable Preload feature that pre-fetches file blocks in advance",
         " --nocachemetadata                Disable metadata caching feature",

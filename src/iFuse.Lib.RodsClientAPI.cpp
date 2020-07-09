@@ -230,25 +230,6 @@ int iFuseRodsClientLogin(rcComm_t *conn) {
     return status;
 }
 
-int iFuseRodsClientLoginWithPassword(rcComm_t *conn, char* password) {
-    iFuseRodsClientOperation_t *oper = _startOperationTimeout(conn);
-    int status;
-
-    if(oper == NULL) {
-        return SYS_MALLOC_ERR;
-    }
-
-    status = obfSavePw(0, 0, 0, password);
-    if(status != 0) {
-        _endOperationTimeout(oper);
-        return status;
-    }
-
-    status = clientLogin(conn);
-    _endOperationTimeout(oper);
-    return status;
-}
-
 int iFuseRodsClientDisconnect(rcComm_t *conn) {
     return rcDisconnect(conn);
 }
