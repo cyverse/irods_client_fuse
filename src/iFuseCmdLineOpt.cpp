@@ -260,6 +260,12 @@ static int _parseFuseCommandArg(char **argv, int argc, int index, iFuseCmdArg_t 
                 // if there's no command found
                 continue;
             }
+
+            if(i >= 0 && i == argc - 1) {
+                // last arg = mount point
+                break;
+            }
+
             strncpy(option->value, argv[i], IFUSE_CMD_ARG_MAX_TOKEN_LEN);
             option->end = i + 1;
             tokens++;
@@ -366,6 +372,7 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                     if(splitter == NULL) {
                         // no splitter found
                         g_Opt.host = strdup(cmd.value);
+                        g_Opt.port = 1247;
                     } else {
                         // has port
                         g_Opt.host = strndup(cmd.value, splitter - cmd.value);
@@ -549,6 +556,7 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                         if(splitter == NULL) {
                             // no splitter found
                             g_Opt.host = strdup(optarg);
+                            g_Opt.port = 1247;
                         } else {
                             // has port
                             g_Opt.host = strndup(optarg, splitter - optarg);

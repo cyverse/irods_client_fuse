@@ -46,6 +46,7 @@ static int checkLoginInfoEnv(rodsEnv *env);
 static void syncLoginInfo(iFuseOpt_t *opt, rodsEnv *env);
 static int checkMountPoint(char *mountPoint, bool nonempty);
 static void registerClientProgram(char *prog);
+static int makeRodsDir();
 
 int main(int argc, char **argv) {
     int status;
@@ -114,6 +115,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    char *homeDir = getenv("HOME");
+    if (homeDir == NULL || strlen(homeDir) == 0) {
+        fprintf(stderr, "iRods Fuse abort: environment variable 'HOME' is not set\n");
+        return 1;
+    }
+
     // check mount point
     status = checkMountPoint(myiFuseOpt.mountpoint, myiFuseOpt.nonempty);
     if(status != 0) {
@@ -127,6 +134,14 @@ int main(int argc, char **argv) {
 
     // save password
     if (myiFuseOpt.password != NULL) {
+        // create a directory
+        status = makeRodsDir();
+        if(status != 0) {
+            fprintf(stderr, "iRods Fuse abort: rods directory creation failed\n");
+            iFuseCmdOptsDestroy();
+            return 1;
+        }
+
         status = obfSavePw(0, 0, 0, myiFuseOpt.password);
         if(status != 0) {
             fprintf(stderr, "iRods Fuse abort: password save failed\n");
@@ -141,6 +156,7 @@ int main(int argc, char **argv) {
         // login info is not supplied
         fprintf(stderr, "iRods Fuse abort: login info not given\n");
         iFuseCmdOptsDestroy();
+        return 1;
     }
 
     status = checkLoginInfoEnv(&myRodsEnv);
@@ -148,6 +164,7 @@ int main(int argc, char **argv) {
         // login info is not supplied
         fprintf(stderr, "iRods Fuse abort: login info not given in RodsEnv\n");
         iFuseCmdOptsDestroy();
+        return 1;
     }
 
     registerClientProgram(argv[0]);
@@ -468,4 +485,22 @@ static void registerClientProgram(char *prog) {
     if(strlen(filename) != 0) {
         mySetenvStr(SP_OPTION, filename);
     }
+}
+
+static int makeRodsDir() {
+    char dirName[NAME_LEN];
+    int mode = 0700;
+    char *getVar = getenv("HOME");
+
+    rstrcpy(dirName, getVar, NAME_LEN);
+    rstrcat(dirName, "/.irods", NAME_LEN);
+
+    int error_code = mkdir(dirName, mode);
+    int errsv = errno;
+    if(error_code != 0 && errsv != EEXIST) {
+        rodsLog(LOG_NOTICE, "mkdir failed in mkrodsdir with error code %d", error_code);
+        return 1;
+    }
+
+    return 0;
 }
