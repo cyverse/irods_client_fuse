@@ -24,6 +24,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <termios.h>
 #include "iFuseCmdLineOpt.hpp"
 #include "iFuse.FS.hpp"
 #include "iFuse.Lib.Conn.hpp"
@@ -42,6 +43,53 @@ static bool _atob(const char *str) {
         return true;
     }
     return false;
+}
+
+char* getPasswordFromStdin() {
+    struct termios termInfo;
+    int status;
+    tcflag_t flag_backup;
+    bool echoOff = false;
+
+    memset(&termInfo, 0, sizeof(struct termios));
+    status = tcgetattr(STDIN_FILENO, &termInfo);
+    if(status == 0) {
+        flag_backup = termInfo.c_lflag;
+        termInfo.c_lflag &= ~ECHO;
+        tcsetattr(STDIN_FILENO, TCSANOW, &termInfo);
+        termInfo.c_lflag = flag_backup;
+        echoOff = true;
+    }
+
+    char inbuf[MAX_PASSWORD_INPUT_LEN*2];
+
+    printf("Enter your current iRODS password:");
+    const char *fgets_return = fgets(inbuf, MAX_PASSWORD_INPUT_LEN, stdin);
+    if(fgets_return != inbuf || strlen(inbuf) < 2) {
+        // Either error or end-of-file encountered.
+        // If anything was actually entered, the length
+        // will be 2 - to include the '\n'.
+        // NO_PASSWORD_ENTERED
+    } else {
+        if(strlen(inbuf) > MAX_PASSWORD_INPUT_LEN - 8) {
+            // exceed length
+        } else {
+            int size = strlen(fgets_return);
+            if(inbuf[size - 1] == '\n') {
+                inbuf[size - 1] = '\0';    /* remove trailing \n */
+            }
+
+            if(echoOff) {
+                tcsetattr(STDIN_FILENO, TCSANOW, &termInfo);
+            }
+            return strdup(inbuf);
+        }
+    }
+
+    if(echoOff) {
+        tcsetattr(STDIN_FILENO, TCSANOW, &termInfo);
+    }
+    return NULL;
 }
 
 void iFuseCmdOptsInit() {
@@ -409,25 +457,7 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                 }
                 processed = true;
             } else if(strcmp(cmd.command, "passwordstdin") == 0) {
-                char inbuf[MAX_PASSWORD_INPUT_LEN*2];
-                printf("Enter your current iRODS password:");
-                const char *fgets_return = fgets(inbuf, MAX_PASSWORD_INPUT_LEN, stdin);
-                if(fgets_return != inbuf || strlen(inbuf) < 2) {
-                    // Either error or end-of-file encountered.
-                    // If anything was actually entered, the length
-                    // will be 2 - to include the '\n'.
-                    // NO_PASSWORD_ENTERED
-                } else {
-                    if(strlen(inbuf) > MAX_PASSWORD_INPUT_LEN - 8) {
-                        // exceed length
-                    } else {
-                        if(inbuf[i - 1] == '\n') {
-                            inbuf[i - 1] = '\0';    /* remove trailing \n */
-                        }
-
-                        g_Opt.password = strdup(inbuf);
-                    }
-                }
+                g_Opt.password = getPasswordFromStdin();
                 processed = true;
             } else if(strcmp(cmd.command, "defresource") == 0) {
                 if(strlen(cmd.value) > 0) {
