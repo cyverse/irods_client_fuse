@@ -74,7 +74,7 @@ def check_mount(mountPoint):
 
 
 def run_command(command_argv):
-    os.spawnvpe(os.P_NOWAIT, command_argv[0], command_argv, os.environ)
+    os.spawnvpe(os.P_WAIT, command_argv[0], command_argv, os.environ)
 
 
 def parse_login_info(login_info_url):
