@@ -21,6 +21,7 @@ import subprocess
 import shlex
 import time
 
+from os import listdir
 from urllib.parse import urlparse
 
 # mount -t irodsfs -o k=v URL /opt/mount
@@ -64,9 +65,16 @@ def which(program):
     return None
 
 
+def check_mount(mountPoint):
+    time.sleep(1)
+    entries = listdir(mountPoint);
+    #for e in entries:
+    #    print(e);
+
+
+
 def run_command(command_argv):
     os.spawnvpe(os.P_NOWAIT, command_argv[0], command_argv, os.environ)
-    time.sleep(5)
 
 
 def parse_login_info(login_info_url):
@@ -177,6 +185,7 @@ def main(argv):
     command = "%s %s -H %s -z %s -u %s %s" % (irodsBin, " ".join(options), host, zone, user, mountPoint)
     #print("executing > %s" % command)
     run_command(command.split())
+    check_mount(mountPoint);
 
 
 if __name__ == "__main__":
