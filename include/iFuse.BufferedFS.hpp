@@ -22,7 +22,7 @@
 #include <pthread.h>
 #include "iFuse.Lib.Fd.hpp"
 
-#define IFUSE_BUFFER_CACHE_BLOCK_SIZE         (1024*1024*1)
+#define IFUSE_BUFFER_CACHE_BLOCK_SIZE         (64*1024)
 
 typedef struct IFuseBufferCache {
     unsigned long fdId;
