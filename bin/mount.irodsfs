@@ -185,7 +185,7 @@ def main(argv):
     command = "%s %s -H %s -z %s -u %s %s" % (irodsBin, " ".join(options), host, zone, user, mountPoint)
     #print("executing > %s" % command)
     run_command(command.split())
-    check_mount(mountPoint);
+    check_mount(mountPoint)
 
 
 if __name__ == "__main__":
