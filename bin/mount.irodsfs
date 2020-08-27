@@ -66,12 +66,18 @@ def which(program):
 
 
 def check_mount(mountPoint):
-    time.sleep(1)
-    entries = listdir(mountPoint);
-    #for e in entries:
-    #    print(e);
+    retry = 0
+    while retry < 10:
+        try:
+            time.sleep(1)
+            entries = listdir(mountPoint)
+            #for e in entries:
+            #    print(e)
+            break
+        except FileNotFoundError:
+            retry += 1
 
-
+    # done
 
 def run_command(command_argv):
     os.spawnvpe(os.P_WAIT, command_argv[0], command_argv, os.environ)
