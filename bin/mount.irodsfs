@@ -66,18 +66,40 @@ def which(program):
 
 
 def check_mount(mountPoint):
+    fuse_mounted = False
+
     retry = 0
     while retry < 10:
         try:
             time.sleep(1)
-            entries = listdir(mountPoint)
-            #for e in entries:
-            #    print(e)
-            break
+
+            with open('/proc/mounts', 'r') as f:
+                for line in f.readlines():
+                    fields = line.split()
+                    program = fields[0]
+                    mountPath = fields[1]
+                    mountType = fields[2]
+
+                    if os.path.samefile(mountPath, mountPoint) and (program == "irodsFs" or mountType == "fuse.irodsFs"):
+                        fuse_mounted = True
+                        break
+
+            retry += 1
         except FileNotFoundError:
             retry += 1
 
+    if not fuse_mounted:
+        print("fuse mount not found for %s" % mountPoint, file=sys.stderr)
+        return False
+
+    accessible = os.access(mountPoint, os.R_OK)
+    if not accessible:
+        print("mount point %s is not accessible" % mountPoint, file=sys.stderr)
+        return False
+
     # done
+    return True
+
 
 def run_command(command_argv):
     os.spawnvpe(os.P_WAIT, command_argv[0], command_argv, os.environ)
@@ -191,7 +213,11 @@ def main(argv):
     command = "%s %s -H %s -z %s -u %s %s" % (irodsBin, " ".join(options), host, zone, user, mountPoint)
     #print("executing > %s" % command)
     run_command(command.split())
-    check_mount(mountPoint)
+    if not check_mount(mountPoint):
+        print("Mount failed", file=sys.stderr)
+        sys.exit(1)
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":
