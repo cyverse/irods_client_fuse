@@ -24,7 +24,7 @@
 // for Postgresql-iCAT only
 //#define USE_CONNREUSE
 
-#define IFUSE_CMD_ARG_MAX_TOKEN_LEN 30
+#define IFUSE_CMD_ARG_MAX_TOKEN_LEN 200
 #define MAX_PASSWORD_INPUT_LEN 100
 
 typedef struct IFuseCmdArg {

@@ -76,16 +76,24 @@ def check_mount(mountPoint):
             with open('/proc/mounts', 'r') as f:
                 for line in f.readlines():
                     fields = line.split()
-                    program = fields[0]
-                    mountPath = fields[1]
-                    mountType = fields[2]
+                    if len(fields) >= 3:
+                        program = fields[0].strip()
 
-                    if os.path.samefile(mountPath, mountPoint) and (program == "irodsFs" or mountType == "fuse.irodsFs"):
-                        fuse_mounted = True
-                        break
+                        if program.lower() == "irodsfs":
+                            mountPath = fields[1].strip()
+                            mountType = fields[2].strip()
+
+                            if os.path.samefile(mountPath, mountPoint) and mountType.lower() == "fuse.irodsfs":
+                                fuse_mounted = True
+                                break
+
+            if fuse_mounted:
+                break
 
             retry += 1
         except FileNotFoundError:
+            retry += 1
+        except OSError:
             retry += 1
 
     if not fuse_mounted:
