@@ -188,9 +188,10 @@ int iFuseRodsClientReadMsgError(int status) {
     }
 }
 
-rcComm_t *iFuseRodsClientConnect(const char *rodsHost, int rodsPort, const char *userName, const char *rodsZone, int reconnFlag, rErrMsg_t *errMsg) {
+rcComm_t *iFuseRodsClientConnect(const char *rodsHost, int rodsPort, const char *userName, const char *rodsZone, const char *clientUserName, const char *clientRodsZone, int reconnFlag, rErrMsg_t *errMsg) {
     rcComm_t *conn = NULL;
-    conn = rcConnect(rodsHost, rodsPort, userName, rodsZone, reconnFlag, errMsg);
+    //conn = rcConnect(rodsHost, rodsPort, userName, rodsZone, reconnFlag, errMsg);
+    conn = _rcConnect(rodsHost, rodsPort, userName, rodsZone, clientUserName, clientRodsZone, errMsg, 0, reconnFlag);
     if(conn != NULL) {
         socklen_t len;
         struct sockaddr_storage addr;

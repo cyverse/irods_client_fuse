@@ -63,7 +63,7 @@ char* getPasswordFromStdin() {
 
     char inbuf[MAX_PASSWORD_INPUT_LEN*2];
 
-    printf("Enter your current iRODS password:");
+    printf("Enter your iRODS password:");
     const char *fgets_return = fgets(inbuf, MAX_PASSWORD_INPUT_LEN, stdin);
     if(fgets_return != inbuf || strlen(inbuf) < 2) {
         // Either error or end-of-file encountered.
@@ -221,6 +221,11 @@ void iFuseCmdOptsDestroy() {
     if(g_Opt.password != NULL) {
         free(g_Opt.password);
         g_Opt.password = NULL;
+    }
+
+    if(g_Opt.clientUserName != NULL) {
+        free(g_Opt.clientUserName);
+        g_Opt.clientUserName = NULL;
     }
 
     if(g_Opt.defResource != NULL) {
@@ -456,6 +461,11 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                     g_Opt.password = strdup(cmd.value);
                 }
                 processed = true;
+            } else if(strcmp(cmd.command, "client_user") == 0 || strcmp(cmd.command, "clientusername") == 0) {
+                if(strlen(cmd.value) > 0) {
+                    g_Opt.clientUserName = strdup(cmd.value);
+                }
+                processed = true;
             } else if(strcmp(cmd.command, "passwordstdin") == 0) {
                 g_Opt.password = getPasswordFromStdin();
                 processed = true;
@@ -536,7 +546,7 @@ int iFuseCmdOptsParse(int argc, char **argv) {
     }
 
     optind = 1;
-    while((c = getopt(argc, argv, "hvVdfo:H:P:z:u:p:t:w:Z")) != -1) {
+    while((c = getopt(argc, argv, "hvVdfo:H:P:z:u:p:U:t:w:Z")) != -1) {
         switch(c) {
             case 'h':
                 {
@@ -631,6 +641,12 @@ int iFuseCmdOptsParse(int argc, char **argv) {
                     if (strlen(optarg) > 0) {
                         g_Opt.password = strdup(optarg);
                     }
+                }
+                break;
+            case 'U':
+                {
+                    // client user name
+                    g_Opt.clientUserName = strdup(optarg);
                 }
                 break;
             case 't':

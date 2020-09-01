@@ -31,7 +31,7 @@ void iFuseRodsClientDestroy();
 
 int iFuseRodsClientReadMsgError(int status);
 
-rcComm_t *iFuseRodsClientConnect(const char *rodsHost, int rodsPort, const char *userName, const char *rodsZone, int reconnFlag, rErrMsg_t *errMsg);
+rcComm_t *iFuseRodsClientConnect(const char *rodsHost, int rodsPort, const char *userName, const char *rodsZone, const char *clientUserName, const char *clientRodsZone, int reconnFlag, rErrMsg_t *errMsg);
 int iFuseRodsClientLogin(rcComm_t *conn);
 int iFuseRodsClientDisconnect(rcComm_t *conn);
 

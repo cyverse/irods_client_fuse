@@ -81,11 +81,11 @@ static int _connect(iFuseConn_t *iFuseConn) {
         assert(opt != NULL);
 
         iFuseConn->conn = iFuseRodsClientConnect(opt->host, opt->port,
-                opt->user, opt->zone, reconnFlag, &errMsg);
+                opt->user, opt->zone, opt->clientUserName, opt->zone, reconnFlag, &errMsg);
         if (iFuseConn->conn == NULL) {
             // try one more
             iFuseConn->conn = iFuseRodsClientConnect(opt->host, opt->port,
-                    opt->user, opt->zone, reconnFlag, &errMsg);
+                    opt->user, opt->zone, opt->clientUserName, opt->zone, reconnFlag, &errMsg);
             if (iFuseConn->conn == NULL) {
                 // failed
                 iFuseLibLogError(LOG_ERROR, errMsg.status,

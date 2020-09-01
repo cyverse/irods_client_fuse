@@ -53,6 +53,7 @@ typedef struct IFuseOpt {
     char *zone;
     char *user;
     char *password;
+    char *clientUserName; // for proxy access
     char *defResource;
     char *ticket;
     char *workdir;
