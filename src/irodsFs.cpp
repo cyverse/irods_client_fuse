@@ -46,7 +46,7 @@ static int checkLoginInfoEnv(rodsEnv *env);
 static void syncLoginInfo(iFuseOpt_t *opt, rodsEnv *env);
 static int checkMountPoint(char *mountPoint, bool nonempty);
 static void registerClientProgram(char *prog);
-static int makeRodsDir();
+static int makeRodsEnvFile();
 
 int main(int argc, char **argv) {
     int status;
@@ -134,10 +134,10 @@ int main(int argc, char **argv) {
 
     // save password
     if (myiFuseOpt.password != NULL) {
-        // create a directory
-        status = makeRodsDir();
+        // create an iRODS environment file
+        status = makeRodsEnvFile();
         if(status != 0) {
-            fprintf(stderr, "iRods Fuse abort: rods directory creation failed\n");
+            fprintf(stderr, "iRods Fuse abort: rods environment file creation failed\n");
             iFuseCmdOptsDestroy();
             return 1;
         }
@@ -487,18 +487,37 @@ static void registerClientProgram(char *prog) {
     }
 }
 
-static int makeRodsDir() {
+static int makeRodsEnvFile() {
     char dirName[NAME_LEN];
-    int mode = 0700;
+    char fileName[NAME_LEN];
+    int dirMode = 0700;
+    int fileMode = 0664;
     char *getVar = getenv("HOME");
 
     rstrcpy(dirName, getVar, NAME_LEN);
     rstrcat(dirName, "/.irods", NAME_LEN);
 
-    int error_code = mkdir(dirName, mode);
+    rstrcat(fileName, dirName, NAME_LEN);
+    rstrcat(fileName, "/irods_environment.json", NAME_LEN);
+
+    int error_code = mkdir(dirName, dirMode);
     int errsv = errno;
     if(error_code != 0 && errsv != EEXIST) {
-        rodsLog(LOG_NOTICE, "mkdir failed in mkrodsdir with error code %d", error_code);
+        rodsLog(LOG_NOTICE, "mkdir failed in makeRodsEnvFile with error code %d", errsv);
+        return 1;
+    }
+
+    int fd = open(fileName, O_RDWR | O_CREAT | O_EXCL, fileMode);
+    errsv = errno;
+    if(fd > 0) {
+        // no error
+        write(fd, "{}", 2);
+        close(fd);
+    } else if(fd == -1 && errsv == EEXIST) {
+        // file exists
+        // pass
+    } else {
+        rodsLog(LOG_NOTICE, "open failed in makeRodsEnvFile with error code %d", errsv);
         return 1;
     }
 
